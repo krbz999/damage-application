@@ -1,0 +1,50 @@
+{
+  "id": "damage-application",
+  "title": "Damage Application",
+  "version": "11.0.0",
+  "authors": [
+    {
+      "name": "Zhell",
+      "url": "https://github.com/krbz999",
+      "discord": "Zhell#9201",
+      "flags": {
+        "ko-fi": "https://ko-fi.com/zhell",
+        "patreon": "https://patreon.com/zhell"
+      }
+    }
+  ],
+  "compatibility": {
+    "minimum": "11",
+    "verified": "11",
+    "maximum": "11"
+  },
+  "esmodules": [
+    "setup.mjs"
+  ],
+  "styles": [
+    "styles/damage-application.css"
+  ],
+  "relationships": {
+    "systems": [
+      {
+        "id": "dnd5e",
+        "type": "system",
+        "manifest": "https://raw.githubusercontent.com/foundryvtt/dnd5e/master/system.json",
+        "compatibility": {
+          "minimum": "2.2.1"
+        }
+      }
+    ]
+  },
+  "languages": [
+    {
+      "lang": "en",
+      "name": "English",
+      "path": "languages/en.json"
+    }
+  ],
+  "url": "https://github.com/krbz999/damage-application",
+  "license": "https://raw.githubusercontent.com/krbz999/damage-application/main/LICENSE",
+  "manifest": "https://github.com/krbz999/damage-application/releases/latest/download/module.json",
+  "download": "https://github.com/krbz999/damage-application/releases/download/v11.0.0/module.zip"
+}

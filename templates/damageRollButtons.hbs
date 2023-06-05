@@ -1,0 +1,30 @@
+<div class="damage-application buttons">
+  <div class="damage-roll-buttons">
+    <button data-action="render" data-tooltip="Render Damage Application">
+      <i class="fa-solid fa-hand-sparkles"></i>
+    </button>
+
+    {{#if isTempHP}}
+    <button data-action="quick-apply" data-tooltip="Apply Temp HP">
+      <i class="fa-solid fa-heart-circle-plus"></i>
+    </button>
+    {{else if isHealing}}
+    <button data-action="quick-apply" data-tooltip="Apply Healing">
+      <i class="fa-solid fa-heart-pulse"></i>
+    </button>
+    {{else if isDamage}}
+    <button data-action="quick-apply" data-tooltip="Apply Damage">
+      <i class="fa-solid fa-burst"></i>
+    </button>
+    <button data-action="quick-apply-half" data-tooltip="Apply Half Damage">
+      <i class="fa-solid fa-shield-halved"></i>
+    </button>
+    {{/if}}
+
+    {{#if save}}
+    <button data-action="save-and-apply" data-tooltip="Save and Apply Damage">
+      <i class="fa-solid fa-person-falling-burst"></i>
+    </button>
+    {{/if}}
+  </div>
+</div>

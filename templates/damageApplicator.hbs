@@ -1,0 +1,119 @@
+<div class="content">
+
+  <div class="message-section">
+    <div class="damage-types">
+      {{#each types}}
+      <div class="type">
+        <label>{{label}}</label> <input type="Number" data-key="{{type}}" value="{{value}}">
+      </div>
+      {{/each}}
+    </div>
+    <div class="damage-total">
+      Total: {{total}}
+    </div>
+    <div class="buttons">
+      <button data-action="apply-damage-all">
+        {{#if isDamage}}
+        <i class="fa-solid fa-burst"></i> Apply Damage to All
+        {{else if isHealing}}
+        <i class="fa-solid fa-heart-pulse"></i> Apply Healing to All
+        {{else if isTempHP}}
+        <i class="fa-solid fa-heart-circle-plus"></i> Apply Temp HP to All
+        {{/if}}
+      </button>
+      {{#if hasSave}}
+      <button data-action="saving-throw-all">
+        <i class="fa-solid fa-person-falling-burst"></i> DC {{save.dc}} {{save.label}} (All)
+      </button>
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="actor-section">
+    {{#each actors}}
+    <div class="actor" data-token-id="{{id}}">
+      <div class="header">
+        <a class="name" data-tooltip="{{actorName}}" data-action="render-actor">{{name}}</a>
+        <img src="{{img}}" data-tooltip="{{name}}" data-action="render-actor">
+        <div class="hp-section">
+          <span data-attr="hp-value">{{hp.value}}</span>
+          <span data-attr="hp-temp">{{#if hp.temp}}(+{{hp.temp}}){{/if}}</span>
+          /
+          <span data-attr="hp-max">{{hp.max}}</span>
+          <span data-attr="hp-tempmax">{{#if hp.tempmax}}(+{{hp.tempmax}}){{/if}}</span>
+        </div>
+        {{#if hasPlayer}}<div class="hasPlayer">(Player-owned)</div>{{/if}}
+        <a data-action="remove-actor" data-tooltip="Remove Actor">
+          <i class="fa-solid fa-trash"></i>
+        </a>
+      </div>
+
+      <div class="functions">
+        <label class="label">Functions</label>
+
+        <div class="util">
+          <a data-action="pan-to-token">
+            <i class="fa-solid fa-magnifying-glass-location"></i> Find Token
+          </a>
+        </div>
+
+        {{#if ../hasSave}}
+        <div class="util">
+          <a data-action="saving-throw" data-ability="{{../save.ability}}" data-dc="{{../save.dc}}">
+            <i class="fa-solid fa-person-falling-burst"></i> DC {{../save.dc}} {{../save.label}}
+          </a>
+          <a data-action="toggle-throw">00</a>
+        </div>
+        {{/if}}
+
+        <div class="util">
+          <a data-action="apply-damage">
+            <i class="fa-solid fa-burst"></i> Apply Damage
+          </a>
+        </div>
+
+      </div>
+
+      {{#if ../isDamage}}
+      <div class="trait-section">
+        {{#if hasResistance}}
+        <label class="label">Resistant</label>
+        {{#each dr}}
+        <div class="type" data-trait="dr" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <a class="{{#unless bypass}}enabled{{/unless}}" data-action="toggle-trait">
+            <i class="fa-solid"></i>
+            <div class="trait-label">{{label}}</div>
+          </a>
+        </div>
+        {{/each}}
+        {{/if}}
+        {{#if hasInvulnerability}}
+        <label class="label">Invulnerable</label>
+        {{#each di}}
+        <div class="type" data-trait="di" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <a class="{{#unless bypass}}enabled{{/unless}}" data-action="toggle-trait">
+            <i class="fa-solid"></i>
+            <div class="trait-label">{{label}}</div>
+          </a>
+        </div>
+        {{/each}}
+        {{/if}}
+        {{#if hasVulnerability}}
+        <label class="label">Vulnerable</label>
+        {{#each dv}}
+        <div class="type" data-trait="dv" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <a class="{{#unless bypass}}enabled{{/unless}}" data-action="toggle-trait">
+            <i class="fa-solid"></i>
+            <div class="trait-label">{{label}}</div>
+          </a>
+        </div>
+        {{/each}}
+        {{/if}}
+      </div>
+      {{/if}}
+
+    </div>
+    {{/each}}
+  </div>
+
+</div>
