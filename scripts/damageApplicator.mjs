@@ -39,11 +39,11 @@ export class DamageApplicator extends Application {
   }
 
   get title() {
-    return `Damage Applicator: ${this.message.id}`;
+    return game.i18n.format("DAMAGE_APP.ApplicationTitle", {id: this.message.id});
   }
 
   get id() {
-    return `${MODULE}-${this.message.uuid.replaceAll(".", "-")}`;
+    return `${MODULE}-${this.message.id}`;
   }
 
   /**
@@ -129,7 +129,7 @@ export class DamageApplicator extends Application {
   /** @override */
   async render(force = false, options = {}) {
     if (!this.targets.length) {
-      ui.notifications.warn("You have no valid tokens.");
+      ui.notifications.warn("DAMAGE_APP.YouHaveNoValidTokens", {localize: true});
       return null;
     }
     return super.render(force, options);
@@ -237,8 +237,12 @@ export class DamageApplicator extends Application {
       const total = Object.values(values).reduce((acc, v) => acc + v, 0);
       if (heal && !this.isTempHP) modifier *= -1;
       if (half) modifier *= 0.5;
-      if (!this.isTempHP) await token.actor.applyDamage(total, modifier);
-      else await token.actor.applyTempHP(total);
+      if (!this.isTempHP) {
+        const bonus = (heal && half && ((total % 2 === 1))) ? -0.5 : 0;
+        await token.actor.applyDamage(total + bonus, modifier);
+      } else {
+        await token.actor.applyTempHP(total);
+      }
     }
   }
 
@@ -318,18 +322,20 @@ export class DamageApplicator extends Application {
       for (const type of types) {
         if (!this.types.includes(type)) continue; // ignore types that aren't relevant for this damage roll.
         const hasBypass = CONFIG.DND5E.physicalDamageTypes[type] && (bypasses.size > 0);
+        const typeLabel = CONFIG.DND5E.damageTypes[type] ?? type;
         if (hasBypass) {
           for (const b of bypasses) {
+            const property = CONFIG.DND5E.physicalWeaponProperties[b].slice(0, 3);
             acc[d].push({
               key: type,
-              label: `Non-${CONFIG.DND5E.physicalWeaponProperties[b].slice(0, 3)} ${CONFIG.DND5E.damageTypes[type]}`,
+              label: game.i18n.format("DAMAGE_APP.NonSpecialProperty", {prop: property, label: typeLabel}),
               bypass: b
             });
           }
         } else {
           acc[d].push({
             key: type,
-            label: `${CONFIG.DND5E.damageTypes[type]}`
+            label: typeLabel
           });
         }
       }

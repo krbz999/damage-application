@@ -8,22 +8,20 @@
       </div>
       {{/each}}
     </div>
-    <div class="damage-total">
-      Total: {{total}}
-    </div>
+    <div class="damage-total">{{localize "DAMAGE_APP.Total" total=total}}</div>
     <div class="buttons">
       <button data-action="apply-damage-all">
         {{#if isDamage}}
-        <i class="fa-solid fa-burst"></i> Apply Damage to All
+        <i class="fa-solid fa-burst"></i> {{localize "DAMAGE_APP.ApplyDamageToAll"}}
         {{else if isHealing}}
-        <i class="fa-solid fa-heart-pulse"></i> Apply Healing to All
+        <i class="fa-solid fa-heart-pulse"></i> {{localize "DAMAGE_APP.ApplyHealingToAll"}}
         {{else if isTempHP}}
-        <i class="fa-solid fa-heart-circle-plus"></i> Apply Temp HP to All
+        <i class="fa-solid fa-heart-circle-plus"></i> {{localize "DAMAGE_APP.ApplyTempHPToAll"}}
         {{/if}}
       </button>
       {{#if hasSave}}
       <button data-action="saving-throw-all">
-        <i class="fa-solid fa-person-falling-burst"></i> DC {{save.dc}} {{save.label}} (All)
+        <i class="fa-solid fa-person-falling-burst"></i> {{localize "DAMAGE_APP.SavingThrowAll" dc=save.dc label=save.label}}
       </button>
       {{/if}}
     </div>
@@ -42,18 +40,18 @@
           <span data-attr="hp-max">{{hp.max}}</span>
           <span data-attr="hp-tempmax">{{#if hp.tempmax}}(+{{hp.tempmax}}){{/if}}</span>
         </div>
-        {{#if hasPlayer}}<div class="hasPlayer">(Player-owned)</div>{{/if}}
+        {{#if hasPlayer}}<div class="hasPlayer">({{localize "DAMAGE_APP.PlayerOwned"}})</div>{{/if}}
         <a data-action="remove-actor" data-tooltip="Remove Actor">
           <i class="fa-solid fa-trash"></i>
         </a>
       </div>
 
       <div class="functions">
-        <label class="label">Functions</label>
+        <label class="label">{{localize "DAMAGE_APP.Functions"}}</label>
 
         <div class="util">
           <a data-action="pan-to-token">
-            <i class="fa-solid fa-magnifying-glass-location"></i> Find Token
+            <i class="fa-solid fa-magnifying-glass-location"></i> {{localize "DAMAGE_APP.FindToken"}}
           </a>
         </div>
 
@@ -68,7 +66,7 @@
 
         <div class="util">
           <a data-action="apply-damage">
-            <i class="fa-solid fa-burst"></i> Apply Damage
+            <i class="fa-solid fa-burst"></i> {{localize "DAMAGE_APP.ApplyDamage"}}
           </a>
         </div>
 
@@ -77,7 +75,7 @@
       {{#if ../isDamage}}
       <div class="trait-section">
         {{#if hasResistance}}
-        <label class="label">Resistant</label>
+        <label class="label">{{localize "DAMAGE_APP.Resistant"}}</label>
         {{#each dr}}
         <div class="type" data-trait="dr" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
           <a class="{{#unless bypass}}enabled{{/unless}}" data-action="toggle-trait">
@@ -88,7 +86,7 @@
         {{/each}}
         {{/if}}
         {{#if hasInvulnerability}}
-        <label class="label">Invulnerable</label>
+        <label class="label">{{localize "DAMAGE_APP.Invulnerable"}}</label>
         {{#each di}}
         <div class="type" data-trait="di" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
           <a class="{{#unless bypass}}enabled{{/unless}}" data-action="toggle-trait">
@@ -99,7 +97,7 @@
         {{/each}}
         {{/if}}
         {{#if hasVulnerability}}
-        <label class="label">Vulnerable</label>
+        <label class="label">{{localize "DAMAGE_APP.Vulnerable"}}</label>
         {{#each dv}}
         <div class="type" data-trait="dv" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
           <a class="{{#unless bypass}}enabled{{/unless}}" data-action="toggle-trait">
