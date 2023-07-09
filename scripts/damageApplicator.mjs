@@ -239,7 +239,7 @@ export class DamageApplicator extends Application {
       if (half) modifier *= 0.5;
       if (!this.isTempHP) {
         const bonus = (heal && half && ((total % 2 === 1))) ? -0.5 : 0;
-        await token.actor.applyDamage(total + bonus, modifier);
+        await token.actor.applyDamage(Math.max(0, total + bonus), modifier);
       } else {
         await token.actor.applyTempHP(total);
       }
@@ -442,7 +442,12 @@ export class DamageApplicator extends Application {
       // If still looping over indices, use those, do nothing else.
       const ind = indices[idx];
       if (ind) {
-        values[ind] = (values[ind] ?? 0) + term.total;
+        const indOf = roll.terms.indexOf(term);
+        if (indOf > 0 && (roll.terms[indOf - 1] instanceof OperatorTerm) && (roll.terms[indOf - 1].operator === "-")) {
+          values[ind] = (values[ind] ?? 0) - term.total;
+        } else {
+          values[ind] = (values[ind] ?? 0) + term.total;
+        }
         currentType = ind;
         idx++;
         continue;
