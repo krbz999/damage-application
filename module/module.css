@@ -1,0 +1,124 @@
+/* DAMAGE APPLICATION */
+.damage-application.app {
+  opacity: 1;
+  transition: opacity 500ms;
+  height: auto !important;
+}
+.damage-application.app.fade {
+  opacity: 0.1;
+  pointer-events: none;
+}
+
+/* Message section */
+.damage-application.app .message-section {
+  margin-bottom: 1em;
+}
+.damage-application.app .damage-types {
+  display: flex;
+  border-top: 1px groove;
+  margin: 0.5em 0 0 0;
+  flex-direction: column;
+}
+.damage-application.app .damage-total {
+  display: flex;
+  justify-content: center;
+  border-bottom: 1px groove;
+  margin: 0 0 0.5em 0;
+  font-size: 1.4em;
+}
+.damage-application.app .damage-types .type {
+  padding: 0.25em;
+  display: flex;
+  align-items: center;
+}
+.damage-application.app .damage-types .type label {
+  flex: 2;
+}
+.damage-application.app .damage-types .type input {
+  flex: 1;
+}
+.damage-application.app .buttons {
+  display: flex;
+  gap: 0.5em;
+}
+
+/* Actor section */
+.damage-application.app [data-action="toggle-trait"].enabled i:before {
+  content: "\f205";
+}
+.damage-application.app [data-action="toggle-trait"]:not(.enabled) i:before {
+  content: "\f204";
+}
+.damage-application.app [data-action="toggle-trait"]:not(.enabled) .trait-name {
+  text-decoration: line-through;
+}
+.damage-application.app .actor {
+  border-top: 2px groove;
+  padding: 0.5em 0;
+  display: grid;
+  grid-template-columns: 5em 1.5fr 3fr 2.5fr;
+}
+.damage-application .actor > :not(:last-child) {
+  border-right: 2px groove;
+}
+.damage-application .actor img {
+  min-width: 5em;
+  min-height: 5em;
+  max-width: 5em;
+  border: none;
+  padding-right: 0.5em;
+}
+.damage-application.app .actor .header {
+  text-align: center;
+}
+.damage-application.app .actor .header .name {
+  font-family: 'Modesto Condensed';
+  font-size: 2em;
+  white-space: nowrap;
+}
+.damage-application.app .actor .header img {
+  border: none;
+  padding: 1em;
+  min-width: 100px;
+  min-height: 100px;
+}
+.damage-application .actor .trait-name {
+  white-space: nowrap;
+  flex: 1;
+  display: flex;
+  justify-content: space-between;
+}
+.damage-application .actor .trait-name .trait-label {
+  font-style: italic;
+  color: gray;
+}
+.damage-application.app .actor .header .hasPlayer {
+  font-style: italic;
+}
+.damage-application.app :is(.trait-section, .functions) {
+  padding: 0 0.5em;
+  display: flex;
+  flex-direction: column;
+}
+.damage-application.app .trait-section [data-action="toggle-trait"] {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.damage-application.app .util {
+  display: flex;
+  align-items: center;
+  white-space: nowrap;
+}
+.damage-application .util .fa-solid {
+  min-width: 1.5em;
+  min-height: 1.5em;
+  text-align: center;
+}
+
+/* Chatlog buttons */
+.damage-application.buttons .damage-roll-buttons {
+  display: flex;
+  margin: 0.5em 0 0.25em 0;
+  gap: 0.5em;
+}

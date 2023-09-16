@@ -1,0 +1,103 @@
+<div class="content">
+
+  <div class="message-section">
+    <form class="damage-types">
+      {{#each types}}
+      <div class="type">
+        <label>{{label}}</label> <input type="number" name="values.{{type}}" data-key="{{type}}" value="{{value}}">
+      </div>
+      {{/each}}
+    </form>
+    <div class="damage-total">{{localize "DAMAGE_APP.Total" total=total}}</div>
+    <div class="buttons">
+      <button data-action="apply-damage-all">
+        {{#if isDamage}}
+        <i class="fa-solid fa-burst"></i> {{localize "DAMAGE_APP.ApplyDamageToAll"}}
+        {{else if isHealing}}
+        <i class="fa-solid fa-heart-pulse"></i> {{localize "DAMAGE_APP.ApplyHealingToAll"}}
+        {{else if isTempHP}}
+        <i class="fa-solid fa-heart-circle-plus"></i> {{localize "DAMAGE_APP.ApplyTempHPToAll"}}
+        {{/if}}
+      </button>
+      {{#if hasSave}}
+      <button data-action="saving-throw-all">
+        <i class="fa-solid fa-person-falling-burst"></i> {{localize "DAMAGE_APP.SavingThrowAll" dc=save.dc label=save.label}}
+      </button>
+      {{/if}}
+    </div>
+  </div>
+
+  <div class="actor-section">
+    {{#each actors}}
+    <div class="actor" data-actor-uuid="{{actorUuid}}">
+      <img src="{{img}}" data-tooltip="{{name}}" data-action="render-actor">
+      <div class="header">
+        <a class="name" data-tooltip="{{actorName}}" data-action="render-actor">{{name}}</a>
+        <div class="hp-section">
+          <span data-attr="hp-value">{{hp.value}}</span>
+          <span data-attr="hp-temp">{{#if hp.temp}}(+{{hp.temp}}){{/if}}</span>
+          /
+          <span data-attr="hp-max">{{hp.max}}</span>
+          <span data-attr="hp-tempmax">{{#if hp.tempmax}}(+{{hp.tempmax}}){{/if}}</span>
+        </div>
+        {{#if hasPlayer}}<div class="hasPlayer">({{localize "DAMAGE_APP.PlayerOwned"}})</div>{{/if}}
+      </div>
+
+      {{#if ../isDamage}}
+      <div class="trait-section">
+        {{#if hasResistance}}
+        {{#each dr}}
+        <a class="{{#if toggled}}enabled{{/if}}" data-action="toggle-trait" data-trait="dr" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <i class="fa-solid"></i>
+          <div class="trait-name">{{label}} <span class="trait-label">{{localize "DAMAGE_APP.Resistant"}}</span></div>
+        </a>
+        {{/each}}
+        {{/if}}
+        {{#if hasInvulnerability}}
+        {{#each di}}
+        <a class="{{#if toggled}}enabled{{/if}}" data-action="toggle-trait" data-trait="di" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <i class="fa-solid"></i>
+          <div class="trait-name">{{label}} <span class="trait-label">{{localize "DAMAGE_APP.Invulnerable"}}</span></div>
+        </a>
+        {{/each}}
+        {{/if}}
+        {{#if hasVulnerability}}
+        {{#each dv}}
+        <a class="{{#if toggled}}enabled{{/if}}" data-action="toggle-trait" data-trait="dv" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <i class="fa-solid"></i>
+          <div class="trait-name">{{label}} <span class="trait-label">{{localize "DAMAGE_APP.Vulnerable"}}</span></div>
+        </a>
+        {{/each}}
+        {{/if}}
+      </div>
+      {{/if}}
+
+      <div class="functions">
+
+        <div class="util">
+          <a data-action="pan-to-token">
+            <i class="fa-solid fa-magnifying-glass-location"></i> {{localize "DAMAGE_APP.FindToken"}}
+          </a>
+        </div>
+
+        {{#if ../hasSave}}
+        <div class="util">
+          <a data-action="saving-throw" data-ability="{{../save.ability}}" data-dc="{{../save.dc}}" {{#if save.success}}class="success"{{/if}}>
+            <i class="fa-solid {{saveIcon}}"></i> DC {{../save.dc}} {{../save.label}} ({{save.total}})
+          </a>
+        </div>
+        {{/if}}
+
+        <div class="util">
+          <a data-action="apply-damage">
+            <i class="fa-solid fa-burst"></i> {{localize "DAMAGE_APP.ApplyDamage"}}
+          </a>
+        </div>
+
+      </div>
+
+    </div>
+    {{/each}}
+  </div>
+
+</div>
