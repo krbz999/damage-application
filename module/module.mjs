@@ -371,7 +371,7 @@ export class DamageApplicator extends Application {
    * @returns {Promise<null|void>}
    */
   static async _quickApplyHealing(event) {
-    const healing = this._getDataFromDamageRoll(event)?.healing;
+    const healing = this._getDataFromDamageRoll(event)?.values.healing;
     if (!healing) return null;
     const actors = this._getActors();
     const undo = event.shiftKey ? 1 : -1;
@@ -384,7 +384,7 @@ export class DamageApplicator extends Application {
    * @returns {Promise<null|void>}
    */
   static async _quickApplyTempHP(event) {
-    const temphp = this._getDataFromDamageRoll(event)?.temphp;
+    const temphp = this._getDataFromDamageRoll(event)?.values.temphp;
     if (!temphp) return null;
     const actors = this._getActors();
     for (const actor of actors) await actor.applyTempHP(healing);
