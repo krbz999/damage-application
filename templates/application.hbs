@@ -11,13 +11,7 @@
     <div class="damage-total">{{localize "DAMAGE_APP.Total" total=total}}</div>
     <div class="buttons">
       <button data-action="apply-damage-all">
-        {{#if isDamage}}
         <i class="fa-solid fa-burst"></i> {{localize "DAMAGE_APP.ApplyDamageToAll"}}
-        {{else if isHealing}}
-        <i class="fa-solid fa-heart-pulse"></i> {{localize "DAMAGE_APP.ApplyHealingToAll"}}
-        {{else if isTempHP}}
-        <i class="fa-solid fa-heart-circle-plus"></i> {{localize "DAMAGE_APP.ApplyTempHPToAll"}}
-        {{/if}}
       </button>
       {{#if hasSave}}
       <button data-action="saving-throw-all">
@@ -43,56 +37,44 @@
         {{#if hasPlayer}}<div class="hasPlayer">({{localize "DAMAGE_APP.PlayerOwned"}})</div>{{/if}}
       </div>
 
-      {{#if ../isDamage}}
       <div class="trait-section">
         {{#if hasResistance}}
         {{#each dr}}
-        <a class="{{#if toggled}}enabled{{/if}}" data-action="toggle-trait" data-trait="dr" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
-          <i class="fa-solid"></i>
-          <div class="trait-name">{{label}} <span class="trait-label">{{localize "DAMAGE_APP.Resistant"}}</span></div>
+        <a class="{{#if enabled}}enabled{{/if}}" data-action="toggle-trait" data-trait="dr" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <span class="trait-name"><i class="fa-solid"></i> {{label}}</span>
+          <div class="trait-label">{{localize "DAMAGE_APP.TraitResistance"}}</div>
         </a>
         {{/each}}
         {{/if}}
         {{#if hasInvulnerability}}
         {{#each di}}
-        <a class="{{#if toggled}}enabled{{/if}}" data-action="toggle-trait" data-trait="di" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
-          <i class="fa-solid"></i>
-          <div class="trait-name">{{label}} <span class="trait-label">{{localize "DAMAGE_APP.Invulnerable"}}</span></div>
+        <a class="{{#if enabled}}enabled{{/if}}" data-action="toggle-trait" data-trait="di" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <span class="trait-name"><i class="fa-solid"></i> {{label}}</span>
+          <div class="trait-label">{{localize "DAMAGE_APP.TraitImmunity"}}</div>
         </a>
         {{/each}}
         {{/if}}
         {{#if hasVulnerability}}
         {{#each dv}}
-        <a class="{{#if toggled}}enabled{{/if}}" data-action="toggle-trait" data-trait="dv" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
-          <i class="fa-solid"></i>
-          <div class="trait-name">{{label}} <span class="trait-label">{{localize "DAMAGE_APP.Vulnerable"}}</span></div>
+        <a class="{{#if enabled}}enabled{{/if}}" data-action="toggle-trait" data-trait="dv" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <span class="trait-name"><i class="fa-solid"></i> {{label}}</span>
+          <div class="trait-label">{{localize "DAMAGE_APP.TraitVulnerability"}}</div>
         </a>
         {{/each}}
         {{/if}}
       </div>
-      {{/if}}
 
       <div class="functions">
 
-        <div class="util">
-          <a data-action="pan-to-token">
-            <i class="fa-solid fa-magnifying-glass-location"></i> {{localize "DAMAGE_APP.FindToken"}}
-          </a>
-        </div>
+        <a data-action="pan-to-token"><i class="fa-solid fa-magnifying-glass-location"></i> {{localize "DAMAGE_APP.FindToken"}}</a>
 
         {{#if ../hasSave}}
-        <div class="util">
-          <a data-action="saving-throw" data-ability="{{../save.ability}}" data-dc="{{../save.dc}}" {{#if save.success}}class="success"{{/if}}>
-            <i class="fa-solid {{saveIcon}}"></i> DC {{../save.dc}} {{../save.label}} ({{save.total}})
-          </a>
-        </div>
+        <a data-action="saving-throw" data-ability="{{../save.ability}}" data-dc="{{../save.dc}}" class="{{savedCssClass}}">
+          <i class="fa-solid {{saveIcon}}"></i> DC {{../save.dc}} {{../save.label}}
+        </a>
         {{/if}}
 
-        <div class="util">
-          <a data-action="apply-damage">
-            <i class="fa-solid fa-burst"></i> {{localize "DAMAGE_APP.ApplyDamage"}}
-          </a>
-        </div>
+        <a data-action="apply-damage"><i class="fa-solid fa-burst"></i> {{localize "DAMAGE_APP.ApplyDamage"}}</a>
 
       </div>
 

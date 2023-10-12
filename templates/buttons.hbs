@@ -1,15 +1,17 @@
 <div class="damage-application buttons">
   <div class="damage-roll-buttons">
+    {{#if (and isGM isDamage)}}
     <button data-action="render" data-tooltip="DAMAGE_APP.RenderDamageApplication">
       <i class="fa-solid fa-hand-sparkles"></i>
     </button>
+    {{/if}}
 
     {{#if isTempHP}}
-    <button data-action="quick-apply" data-tooltip="DAMAGE_APP.ApplyTempHP">
+    <button data-action="quick-apply-temphp" data-tooltip="DAMAGE_APP.ApplyTempHP">
       <i class="fa-solid fa-heart-circle-plus"></i>
     </button>
     {{else if isHealing}}
-    <button data-action="quick-apply" data-tooltip="DAMAGE_APP.ApplyHealing">
+    <button data-action="quick-apply-healing" data-tooltip="DAMAGE_APP.ApplyHealing">
       <i class="fa-solid fa-heart-pulse"></i>
     </button>
     {{else if isDamage}}

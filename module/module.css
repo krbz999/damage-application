@@ -1,12 +1,16 @@
 /* DAMAGE APPLICATION */
 .damage-application.app {
-  opacity: 1;
+  /*opacity: 1;*/
   transition: opacity 500ms;
-  height: auto !important;
 }
 .damage-application.app.fade {
   opacity: 0.1;
   pointer-events: none;
+}
+.damage-application.app .content {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* Message section */
@@ -43,6 +47,9 @@
 }
 
 /* Actor section */
+.damage-application.app .actor-section {
+  overflow: hidden overlay;
+}
 .damage-application.app [data-action="toggle-trait"].enabled i:before {
   content: "\f205";
 }
@@ -82,13 +89,8 @@
   min-width: 100px;
   min-height: 100px;
 }
-.damage-application .actor .trait-name {
-  white-space: nowrap;
-  flex: 1;
-  display: flex;
-  justify-content: space-between;
-}
-.damage-application .actor .trait-name .trait-label {
+.damage-application .actor .trait-name {}
+.damage-application .actor .trait-label {
   font-style: italic;
   color: gray;
 }
@@ -102,15 +104,18 @@
 }
 .damage-application.app .trait-section [data-action="toggle-trait"] {
   display: flex;
-  align-items: center;
-  gap: 5px;
+  justify-content: space-between;
 }
-.damage-application.app .util {
-  display: flex;
-  align-items: center;
+.damage-application.app .functions [data-action] {
   white-space: nowrap;
 }
-.damage-application .util .fa-solid {
+.damage-application.app .functions [data-action="saving-throw"].failure {
+  color: red;
+}
+.damage-application.app .functions [data-action="saving-throw"].success {
+  color: green;
+}
+.damage-application.app .functions [data-action] .fa-solid {
   min-width: 1.5em;
   min-height: 1.5em;
   text-align: center;
