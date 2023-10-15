@@ -371,11 +371,12 @@ export class DamageApplicator extends Application {
    * @returns {Promise<null|void>}
    */
   static async _quickApplyHealing(event) {
-    const healing = this._getDataFromDamageRoll(event)?.values.healing;
-    if (!healing) return null;
+    const id = event.currentTarget.closest("[data-message-id]").dataset.messageId;
+    const message = game.messages.get(id);
+    const value = message.rolls[0].total;
     const actors = this._getActors();
     const undo = event.shiftKey ? 1 : -1;
-    for (const actor of actors) await actor.applyDamage(healing, undo);
+    for (const actor of actors) await actor.applyDamage(value, undo);
   }
 
   /**
@@ -384,10 +385,11 @@ export class DamageApplicator extends Application {
    * @returns {Promise<null|void>}
    */
   static async _quickApplyTempHP(event) {
-    const temphp = this._getDataFromDamageRoll(event)?.values.temphp;
-    if (!temphp) return null;
+    const id = event.currentTarget.closest("[data-message-id]").dataset.messageId;
+    const message = game.messages.get(id);
+    const value = message.rolls[0].total;
     const actors = this._getActors();
-    for (const actor of actors) await actor.applyTempHP(healing);
+    for (const actor of actors) await actor.applyTempHP(value);
   }
 
   /* -------------------------------------- */
@@ -602,9 +604,12 @@ export class DamageApplicator extends Application {
     for (const [formula, type] of parts) {
       const terms = new CONFIG.Dice.DamageRoll(formula, config.data).terms;
       for (const term of terms) {
-        if (!(term instanceof Die) && !(term instanceof NumericTerm)) continue;
-        indices[idx] = type;
-        idx++;
+        if ((term instanceof Die) || (term instanceof NumericTerm) || (term instanceof MathTerm)) indices[idx] = type;
+
+        // Is the next term an actual new term, math-wise?
+        const nextTerm = terms[terms.indexOf(term) + 1];
+        const nextIsNewTerm = !nextTerm || ((nextTerm instanceof OperatorTerm) && ["+", "-"].includes(nextTerm.operator));
+        if (nextIsNewTerm) idx++;
       }
     }
 
@@ -613,8 +618,8 @@ export class DamageApplicator extends Application {
     }) : [];
 
     config.messageData[`flags.${DamageApplicator.MODULE}.damage`] = {
-      indices,
-      bypasses,
+      indices: indices,
+      bypasses: bypasses,
       hasSave: item.hasSave,
       saveData: item.system.save
     };
@@ -628,58 +633,73 @@ export class DamageApplicator extends Application {
     if (message.flags.dnd5e?.roll?.type !== "damage") return;
 
     const indices = message.flags[DamageApplicator.MODULE].damage.indices;
-    let currentType = indices[0];
+    const terms = message.rolls[0].terms;
     let idx = 0;
 
-    const roll = message.rolls[0];
-    const values = {};
-
-    const damageLabels = Object.values(CONFIG.DND5E.damageTypes);
-
-    for (const term of roll.terms) {
-      if (!(term instanceof Die) && !(term instanceof NumericTerm)) continue;
-
-      // If still looping over indices, use those, do nothing else.
-      const ind = indices[idx];
-      if (ind) {
-        const indOf = roll.terms.indexOf(term);
-        if (indOf > 0 && (roll.terms[indOf - 1] instanceof OperatorTerm) && (roll.terms[indOf - 1].operator === "-")) {
-          values[ind] = (values[ind] ?? 0) - term.total;
-        } else {
-          values[ind] = (values[ind] ?? 0) + term.total;
-        }
-        currentType = ind;
+    // Toss the full array of terms into an object, respecting +/- operators only.
+    const pools = Object.fromEntries(Object.keys(indices).map(v => [v, {}]));
+    for (const term of terms) {
+      const isOp = term instanceof OperatorTerm;
+      const goNext = isOp && ["+", "-"].includes(term.operator) && (terms.indexOf(term) !== 0);
+      if (goNext) {
         idx++;
+        pools[idx] = {sign: term.operator, terms: []};
         continue;
-      }
-
-      // If the term has flavor, use this as the damage type if it is valid, otherwise use the default type.
-      const fl = term.options.flavor;
-      let type;
-      if (!fl) {
-        // No flavor, use the type of the previous term.
-        type = currentType;
       } else {
-        const slg = fl.slugify({strict: true});
-
-        // If the type exists, use that.
-        if (fl in CONFIG.DND5E.damageTypes) type = fl;
-        // If the type slugified exists, use that.
-        else if (slg in CONFIG.DND5E.damageTypes) type = slg;
-        // If the type is a proper label instead, use the type that corresponds to it.
-        else if (damageLabels.includes(fl)) type = Object.entries(CONFIG.DND5E.damageTypes).find(dt => dt[1] === fl)[0];
-        // Default to the default type.
-        else type = indices[0];
+        pools[idx].sign ??= (isOp ? term.operator : "+");
+        pools[idx].type ??= indices[idx];
+        pools[idx].terms ??= [];
+        if (pools[idx].terms.length || !isOp) pools[idx].terms.push(term);
       }
-      values[type] = (values[type] ?? 0) + term.total;
-      idx++;
     }
 
-    // If the derived total is less than the actual total, add the remainder onto the first type.
-    const valueTotal = Object.values(values).reduce((acc, v) => acc + v, 0);
-    if (valueTotal < roll.total) values[indices[0]] += (roll.total - valueTotal);
+    const defaultType = pools[0].type;
 
-    message.updateSource({[`flags.${DamageApplicator.MODULE}.damage`]: {values}, "flags.core.canPopout": true});
+    // Calculate totals of each pool, and assign damage type.
+    for (const i in pools) {
+      const terms = pools[i].terms;
+      const flavorType = DamageApplicator._isValidFlavorType(terms[0].options.flavor);
+
+      if (terms.length > 1) {
+        // If the pool has more than 1 term, ignore flavor.
+        pools[i].total = Roll.safeEval(terms.map(t => t.total).join(""));
+      } else if (flavorType) {
+        // If the single term has flavor, use that if it is valid.
+        pools[i].type = flavorType;
+        pools[i].total = terms[0].total;
+      } else {
+        // Set the damage type to be what it already is, or if none found use the default one.
+        pools[i].type ??= defaultType;
+        pools[i].total = terms[0].total;
+      }
+    }
+
+    // Figure out the totals of each damage type.
+    const values = Object.values(pools).reduce((acc, data) => {
+      const type = data.type;
+      acc[type] ??= 0;
+      if (data.sign === "+") acc[type] += data.total;
+      else if (data.sign === "-") acc[type] -= data.total;
+      return acc;
+    }, {});
+
+    message.updateSource({[`flags.${DamageApplicator.MODULE}.damage`]: {values: values}, "flags.core.canPopout": true});
+  }
+
+  /**
+   * Is the flavor used for a term a valid damage type?
+   * @param {string} flavor         The flavor, if any.
+   * @returns {string|boolean}      The corrected damage type, or false if invalid.
+   */
+  static _isValidFlavorType(flavor) {
+    if (!flavor) return false;
+    const lower = flavor.toLowerCase();
+    const types = CONFIG.DND5E.damageTypes;
+    if (flavor in types) return flavor;
+    else if (lower in types) return lower;
+    else if (Object.values(types).includes(flavor)) return Object.keys(types).find(k => types[k] === flavor);
+    else if (Object.values(types).includes(lower)) return Object.keys(types).find(k => types[k] === lower);
+    else return false;
   }
 }
 
