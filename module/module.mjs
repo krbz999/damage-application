@@ -9,12 +9,38 @@ export class DamageApplicator extends Application {
    */
   static MODULE = "damage-application";
 
+  /**
+   * Damage colors.
+   * @type {object}
+   */
+  static COLORS = {
+    acid: "839D50",
+    bludgeoning: "0000A0",
+    cold: "ADD8E6",
+    fire: "FF4500",
+    force: "800080",
+    lightning: "1E90FF",
+    necrotic: "006400",
+    piercing: "C0C0C0",
+    poison: "8A2BE2",
+    psychic: "FF1493",
+    radiant: "FFD700",
+    slashing: "8B0000",
+    thunder: "708090"
+  };
+
   /** Initialize module. */
   static init() {
     Hooks.on("renderChatMessage", DamageApplicator._appendToDamageRolls);
     Hooks.on("dnd5e.preRollDamage", DamageApplicator._appendDamageRollData);
     Hooks.on("preCreateChatMessage", DamageApplicator._appendMoreDamageRollData);
     game.modules.get(DamageApplicator.MODULE).api = DamageApplicator;
+    DamageApplicator._registerSettings();
+    Hooks.once("ready", function() {
+      if (!game.settings.get(DamageApplicator.MODULE, "colors")) return;
+      Hooks.on("preUpdateActor", DamageApplicator._preUpdateActor);
+      Hooks.on("updateActor", DamageApplicator._updateActor);
+    });
   }
 
   /**
@@ -251,8 +277,8 @@ export class DamageApplicator extends Application {
   async _applyDamageToActor(uuid) {
     const {actor, clone, saved} = this.actorData[uuid];
     const {values, bypasses} = this.model;
-    const damage = this.constructor.calculateDamage(clone, values, bypasses);
-    return actor.applyDamage(damage, !!saved ? 0.5 : 1);
+    const {total: damage, values: totals} = this.constructor.calculateDamage(clone, values, bypasses, !!saved);
+    return DamageApplicator._protoApplyDamage.call(actor, totals);
   }
   /**
    * Perform a saving throw for the selected token's actor, then append the result just below.
@@ -299,7 +325,9 @@ export class DamageApplicator extends Application {
   static _getDataFromDamageRoll(event) {
     const id = event.currentTarget.closest("[data-message-id]").dataset.messageId;
     const message = game.messages.get(id);
-    return message.flags[DamageApplicator.MODULE].damage;
+    const data = {...message.flags[DamageApplicator.MODULE].damage};
+    data.bypasses = new Set(data.bypasses ?? []);
+    return data;
   }
 
   /**
@@ -417,43 +445,47 @@ export class DamageApplicator extends Application {
    * Apply damage to an actor, taking into account types, values, trait, bypasses.
    * @param {Actor5e} actor               The actor.
    * @param {object} values               An object with damage types as keys and their totals.
-   * @param {string[]} [bypasses=[]]      Strings of bypass weapon properties.
+   * @param {Set<string>} [bypasses]      Strings of bypass weapon properties.
    * @param {boolean} [half=false]        Whether to halve the damage.
    * @returns {Promise<Actor5e|null>}
    */
-  static async applyDamage(actor, values, bypasses = [], half = false) {
+  static async applyDamage(actor, values, bypasses, half = false) {
+    bypasses ??= new Set();
     if (!this.canDamageActor(actor)) return null;
-    const total = this.calculateDamage(actor, values, bypasses);
-    return actor.applyDamage(total, half ? 0.5 : 1);
+    const {total, values: totals} = this.calculateDamage(actor, values, bypasses, half);
+    return this._protoApplyDamage.call(actor, totals);
   }
 
   /**
    * Undo the damage done to an actor, taking into account types, values, traits, bypasses.
    * @param {Actor5e} actor               The actor.
    * @param {object} values               An object with damage types as keys and their totals.
-   * @param {string[]} [bypasses=[]]      Strings of bypass weapon properties.
+   * @param {Set<string>} [bypasses]      Strings of bypass weapon properties.
    * @param {boolean} [half=false]        Whether to halve the damage.
    * @returns {Promise<Actor5e>}
    */
-  static async undoDamage(actor, values, bypasses = [], half = false) {
-    const total = this.calculateDamage(actor, values, bypasses);
+  static async undoDamage(actor, values, bypasses, half = false) {
+    bypasses ??= new Set();
+    const {total, values: totals} = this.calculateDamage(actor, values, bypasses, half);
     const adjustment = (half && ((total % 2) === 1)) ? -0.5 : 0;
-    return actor.applyDamage(total + adjustment, half ? -0.5 : -1);
+    return actor.applyDamage(total + adjustment, -1);
   }
 
   /**
-   * Calculate the damage taken by an actor, taking into account types, values, traits, and bypasses.
-   * @param {Actor5e} actor             The actor.
-   * @param {object} values             An object with damage types as keys and their totals.
-   * @param {string[]} [passes=[]]      An array of properties that bypass traits.
-   * @returns {number}                  The total damage taken (or healing granted).
+   * Calculate the damage taken by an actor, taking into account types, values, traits, bypasses, and halving.
+   * @param {Actor5e} actor                             The actor.
+   * @param {object} values                             An object with damage types as keys and their totals.
+   * @param {Set<string>} [passes]                      An array of properties that bypass traits.
+   * @param {boolean} [half=false]                      Should the values be halved?
+   * @returns {object<total:number, values:object>}     The total damage taken (or healing granted), and modified values.
    */
-  static calculateDamage(actor, values, passes = []) {
+  static calculateDamage(actor, values, passes, half = false) {
+    passes ??= new Set();
     values = foundry.utils.deepClone(values);
     const {dr, di, dv} = ["dr", "di", "dv"].reduce((acc, d) => {
       const trait = actor.system.traits[d];
       const types = new Set(trait.value);
-      const bypasses = trait.bypasses.filter(b => passes.includes(b));
+      const bypasses = trait.bypasses.filter(b => passes.has(b));
       if (trait.custom?.length) for (const val of trait.custom.split(";")) {
         const t = val.trim();
         if (t in values) types.add(t);
@@ -466,9 +498,10 @@ export class DamageApplicator extends Application {
     for (const d of dr) if (!d.bypass) values[d.key] *= 0.5;
     for (const d of di) if (!d.bypass) values[d.key] = 0;
     for (const d of dv) if (!d.bypass) values[d.key] *= 2;
+    if (half) for (const k in values) values[k] *= 0.5;
 
     const total = Object.values(values).reduce((acc, v) => acc + v, 0);
-    return Math.max(0, total);
+    return {total: Math.max(0, total), values};
   }
 
   /**
@@ -700,6 +733,115 @@ export class DamageApplicator extends Application {
     else if (Object.values(types).includes(flavor)) return Object.keys(types).find(k => types[k] === flavor);
     else if (Object.values(types).includes(lower)) return Object.keys(types).find(k => types[k] === lower);
     else return false;
+  }
+
+  /* -------------------------------------- */
+  /*                                        */
+  /*             DAMAGE NUMBERS             */
+  /*                                        */
+  /* -------------------------------------- */
+
+  /**
+   * When an actor is updated with values known from this module, display custom scrolling damage numbers.
+   * @param {Actor5e} actor
+   * @param {object} updates
+   * @param {object} options
+   * @param {string} userId
+   */
+  static _preUpdateActor(actor, updates, options, userId) {
+    if (!("dhp" in options) || !("daValues" in options)) return;
+    delete options.dhp;
+  }
+
+  /**
+   * Read whether to display scrolling damage numbers.
+   * @param {Actor5e} actor
+   * @param {object} updates
+   * @param {object} options
+   * @param {string} userId
+   */
+  static _updateActor(actor, updates, options, userId) {
+    if (!("daValues" in options)) return;
+    DamageApplicator.displayScrollingDamage(actor, options.daValues);
+  }
+
+  /**
+   * Display damage numbers with typed colors on the tokens of an actor.
+   * @param {Actor5e} actor       The actor being damaged.
+   * @param {object} damages      An object of damage types and their totals.
+   * @returns {Promise<void>}
+   */
+  static async displayScrollingDamage(actor, damages) {
+    if (!damages) return;
+    const tokens = actor.isToken ? [actor.token?.object] : actor.getActiveTokens(true);
+    for (const t of tokens) {
+      if (!t.visible || !t.renderable) continue;
+      for (const type in damages) {
+        const amt = damages[type].toNearest(0.5);
+        if (!amt) continue;
+        const pct = Math.clamped(amt / actor.system.attributes.hp.max, 0, 1);
+        canvas.interface.createScrollingText(t.center, (-amt).signedString(), {
+          duration: 2000,
+          anchor: CONST.TEXT_ANCHOR_POINTS.TOP,
+          fill: DamageApplicator.COLORS[type] ?? CONFIG.DND5E.tokenHPColors.damage,
+          stroke: 0x000000,
+          strokeThickness: 1,
+          jitter: 2,
+          fontSize: 16 + (32 * pct)
+        });
+        await new Promise(r => setTimeout(r, 150));
+      }
+    }
+  }
+
+  /**
+   * Custom damage application method that calculates like Actor5e#applyDamage and passes one more option.
+   * @param {object} daValues           An object of damage types and their totals.
+   * @returns {Promise<Actor5e>}        The updated actor.
+   */
+  static async _protoApplyDamage(daValues) {
+    let amount = Object.values(daValues).reduce((acc, v) => acc + v, 0);
+    amount = Math.floor(parseInt(amount));
+    const hp = this.system.attributes.hp;
+
+    // Deduct damage from temp HP first
+    const tmp = parseInt(hp.temp) || 0;
+    const dt = amount > 0 ? Math.min(tmp, amount) : 0;
+
+    // Remaining goes to health
+    const tmpMax = parseInt(hp.tempmax) || 0;
+    const dh = Math.clamped(hp.value - (amount - dt), 0, Math.max(0, hp.max + tmpMax));
+
+    // Update the Actor
+    const updates = {
+      "system.attributes.hp.temp": tmp - dt,
+      "system.attributes.hp.value": dh
+    };
+
+    // Delegate damage application to a hook.
+    const allowed = Hooks.call("modifyTokenAttribute", {
+      attribute: "attributes.hp", value: amount, isDelta: false, isBar: true
+    }, updates);
+    if (allowed !== false) await this.update(updates, {dhp: -amount, daValues});
+    return this;
+  }
+
+  /* -------------------------------------- */
+  /*                                        */
+  /*                SETTINGS                */
+  /*                                        */
+  /* -------------------------------------- */
+
+  static _registerSettings() {
+    game.settings.register(DamageApplicator.MODULE, "colors", {
+      name: "DAMAGE_APP.SettingsColors",
+      hint: "DAMAGE_APP.SettingsColorsHint",
+      type: Boolean,
+      default: false,
+      config: true,
+      scope: "world",
+      requiresReload: true
+    });
   }
 }
 
