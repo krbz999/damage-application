@@ -132,21 +132,19 @@ export class DamageApplicator extends Application {
         for (const value of actor.system.traits[d].value) {
           if (!(value in CONFIG.DND5E.damageTypes) || !types.includes(value)) continue;
 
-          const traitBypasses = actor.system.traits[d].bypasses;
-
-          // Is this type invalid due to beibng a physical damage type and bypassed?
+          // Is this type invalid due to being a physical damage type and bypassed?
           const isPhysical = value in CONFIG.DND5E.physicalDamageTypes;
-          const isBypassed = this.model.bypasses.length > 0;
-          const actorBypasses = traitBypasses.intersects(new Set(this.model.bypasses));
-          if (isPhysical && isBypassed && actorBypasses) continue;
+          const attackBypasses = this.model.bypasses;
+          const actorBypasses = actor.system.traits[d].bypasses;
+          if (isPhysical && attackBypasses.size && actorBypasses.size && attackBypasses.intersects(actorBypasses)) continue;
 
 
-          const bypass = isPhysical && (traitBypasses.size > 0);
+          const bypass = isPhysical && (actorBypasses.size > 0);
           let label;
           if (bypass) {
             label = game.i18n.format("DND5E.DamagePhysicalBypasses", {
               damageTypes: CONFIG.DND5E.damageTypes[value],
-              bypassTypes: [...traitBypasses.map(p => CONFIG.DND5E.physicalWeaponProperties[p])].filterJoin(", ")
+              bypassTypes: [...actorBypasses.map(p => CONFIG.DND5E.physicalWeaponProperties[p])].filterJoin(", ")
             });
           } else {
             label = CONFIG.DND5E.damageTypes[value]
@@ -599,9 +597,12 @@ export class DamageApplicator extends Application {
   static _appendDamageRollData(item, config) {
     const parts = item.system.damage.parts;
     const indices = {};
+    const ammo = config.data.ammo ? item.actor.items.get(item.system.consume.target) : null;
+    const ammoParts = ammo ? ammo.system.damage.parts : [];
+    const hasProps = ["ammo", "weapon"].includes(item.type);
 
     let idx = 0;
-    for (const [formula, type] of parts) {
+    for (const [formula, type] of parts.concat(ammoParts)) {
       const terms = new CONFIG.Dice.DamageRoll(formula, config.data).terms;
       for (const term of terms) {
         if ((term instanceof Die) || (term instanceof NumericTerm) || (term instanceof MathTerm)) indices[idx] = type;
@@ -613,13 +614,12 @@ export class DamageApplicator extends Application {
       }
     }
 
-    const bypasses = item.system.properties ? Object.keys(CONFIG.DND5E.physicalWeaponProperties).filter(p => {
-      return item.system.properties[p];
-    }) : [];
+    const bypasses = hasProps ? Object.keys(CONFIG.DND5E.physicalWeaponProperties).filter(p => item.system.properties[p]) : [];
+    const ammoBypasses = ammo ? Object.keys(CONFIG.DND5E.physicalWeaponProperties).filter(p => ammo.system.properties[p]) : [];
 
     config.messageData[`flags.${DamageApplicator.MODULE}.damage`] = {
       indices: indices,
-      bypasses: bypasses,
+      bypasses: bypasses.concat(ammoBypasses),
       hasSave: item.hasSave,
       saveData: item.system.save
     };
@@ -658,7 +658,7 @@ export class DamageApplicator extends Application {
     // Calculate totals of each pool, and assign damage type.
     for (const i in pools) {
       const terms = pools[i].terms;
-      const flavorType = DamageApplicator._isValidFlavorType(terms[0].options.flavor);
+      const flavorType = DamageApplicator._isValidFlavorType(terms[0]?.options.flavor);
 
       if (terms.length > 1) {
         // If the pool has more than 1 term, ignore flavor.
@@ -666,11 +666,11 @@ export class DamageApplicator extends Application {
       } else if (flavorType) {
         // If the single term has flavor, use that if it is valid.
         pools[i].type = flavorType;
-        pools[i].total = terms[0].total;
+        pools[i].total = terms[0]?.total ?? 0;
       } else {
         // Set the damage type to be what it already is, or if none found use the default one.
         pools[i].type ??= defaultType;
-        pools[i].total = terms[0].total;
+        pools[i].total = terms[0]?.total ?? 0;
       }
     }
 
