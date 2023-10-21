@@ -208,6 +208,9 @@ export class DamageApplicator extends Application {
     html[0].querySelectorAll(".damage-types [name]").forEach(n => {
       n.addEventListener("change", this._onChangeDamageValue.bind(this));
     });
+    html[0].querySelectorAll("INPUT[data-key]").forEach(n => {
+      n.addEventListener("focus", event => event.currentTarget.select());
+    });
   }
 
   /** @override */
@@ -258,15 +261,30 @@ export class DamageApplicator extends Application {
    */
   async _onClickApplyDamage(event) {
     const uuid = event.currentTarget.closest("[data-actor-uuid]").dataset.actorUuid;
+    if (event.shiftKey) return this._undoDamageToActor(uuid);
     return this._applyDamageToActor(uuid);
   }
 
   /**
    * Apply damage to all actors in the application.
+   * @param {PointerEvent} event      The initiating click event.
    * @returns {Promise<Actor5e[]>}
    */
-  async _onClickApplyDamageAll() {
-    return Promise.all(Object.keys(this.actorData).map(uuid => this._applyDamageToActor(uuid)));
+  async _onClickApplyDamageAll(event) {
+    const uuids = Object.keys(this.actorData);
+    if (event.shiftKey) return Promise.all(uuids.map(uuid => this._undoDamageToActor(uuid)));
+    return Promise.all(uuids.map(uuid => this._applyDamageToActor(uuid)));
+  }
+
+  /**
+   * Undo the ddmage to one actor from its uuid.
+   * @param {string} uuid     The uuid of an actor in this application.
+   * @returns {Promise<Actor5e>}
+   */
+  async _undoDamageToActor(uuid) {
+    const {clone, saved} = this.actorData[uuid];
+    const {values, bypasses} = this.model;
+    return DamageApplicator.undoDamage(clone, values, bypasses, !!saved);
   }
 
   /**
@@ -498,9 +516,11 @@ export class DamageApplicator extends Application {
     for (const d of dr) if (!d.bypass) values[d.key] *= 0.5;
     for (const d of di) if (!d.bypass) values[d.key] = 0;
     for (const d of dv) if (!d.bypass) values[d.key] *= 2;
-    if (half) for (const k in values) values[k] *= 0.5;
 
-    const total = Object.values(values).reduce((acc, v) => acc + v, 0);
+    const total = Object.entries(values).reduce((acc, [key, value]) => {
+      values[key] = Math.floor(value * (half ? 0.5 : 1));
+      return acc + values[key];
+    }, 0);
     return {total: Math.max(0, total), values};
   }
 
@@ -774,23 +794,30 @@ export class DamageApplicator extends Application {
   static async displayScrollingDamage(actor, damages) {
     if (!damages) return;
     const tokens = actor.isToken ? [actor.token?.object] : actor.getActiveTokens(true);
-    for (const t of tokens) {
-      if (!t.visible || !t.renderable) continue;
-      for (const type in damages) {
-        const amt = damages[type].toNearest(0.5);
-        if (!amt) continue;
-        const pct = Math.clamped(amt / actor.system.attributes.hp.max, 0, 1);
-        canvas.interface.createScrollingText(t.center, (-amt).signedString(), {
-          duration: 2000,
-          anchor: CONST.TEXT_ANCHOR_POINTS.TOP,
-          fill: DamageApplicator.COLORS[type] ?? CONFIG.DND5E.tokenHPColors.damage,
-          stroke: 0x000000,
-          strokeThickness: 1,
-          jitter: 2,
-          fontSize: 16 + (32 * pct)
-        });
-        await new Promise(r => setTimeout(r, 150));
-      }
+    for (const token of tokens) DamageApplicator._displayScrollingDamage(token, damages);
+  }
+
+  /**
+   * Display scrolling damage numbers on one particular token.
+   * @param {Token5e} token
+   * @param {object} values     Object of damage types and numeric values.
+   * @returns {Promise<void>}
+   */
+  static async _displayScrollingDamage(token, values) {
+    if (!token.visible || !token.renderable) return;
+    for (const type in values) {
+      const amt = values[type] ? (-values[type].signedString()) : "0";
+      const pct = Math.clamped(amt / token.actor.system.attributes.hp.max, 0, 1);
+      canvas.interface.createScrollingText(token.center, amt, {
+        duration: 2000,
+        anchor: CONST.TEXT_ANCHOR_POINTS.TOP,
+        fill: DamageApplicator.COLORS[type] ?? CONFIG.DND5E.tokenHPColors.damage,
+        stroke: 0x000000,
+        strokeThickness: 1,
+        jitter: 2,
+        fontSize: 16 + (32 * pct)
+      });
+      await new Promise(r => setTimeout(r, 150));
     }
   }
 

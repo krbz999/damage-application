@@ -70,7 +70,7 @@
 
         {{#if ../hasSave}}
         <a data-action="saving-throw" data-ability="{{../save.ability}}" data-dc="{{../save.dc}}" class="{{savedCssClass}}">
-          <i class="fa-solid {{saveIcon}}"></i> DC {{../save.dc}} {{../save.label}}
+          <i class="fa-solid {{saveIcon}}"></i> {{localize "DAMAGE_APP.SavingThrow" dc=../save.dc label=../save.label}}
         </a>
         {{/if}}
 

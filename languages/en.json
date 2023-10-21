@@ -11,6 +11,7 @@
   "DAMAGE_APP.PlayerOwned": "Player-owned",
   "DAMAGE_APP.RenderDamageApplication": "Manual Application",
   "DAMAGE_APP.SaveAndApplyDamage": "Save and Apply Damage",
+  "DAMAGE_APP.SavingThrow": "DC {dc} {label}",
   "DAMAGE_APP.SavingThrowAll": "DC {dc} {label} (All)",
   "DAMAGE_APP.SettingsColors": "Damage Numbers in Colors",
   "DAMAGE_APP.SettingsColorsHint": "Display damage numbers in colors corresponding to damage type.",

@@ -15,9 +15,11 @@ When rolling damage, several buttons are available.
 
 A primary button, available only to GMs, will render an application where some manual adjustments can be made. You can adjust the damage values, toggle off which traits will affect the application, and roll saving throws and apply damage individually to each of the selected token actors. The remaining buttons are for quick application.
 
-One button simply applies the damage, as is, to the actors of all selected tokens. This will respect resistances, immunities, and vulnerabilities, including special ones like 'Resistance to Slashing from Non-Magical Attacks'. If you shift-click this button, the same amount will be applied as healing instead. The other button does the same as this, but halves all the values.
+One button simply applies the damage, as is, to the actors of all selected tokens. This will respect resistances, immunities, and vulnerabilities, including special ones like 'Resistance to Slashing from Non-Magical Attacks'. The other button does the same as this, but halves all the values.
 
 Lastly, if the item that rolled the damage had a saving throw, a button is available that will perform the relevant saving throw for each selected token's actor in sequence. The damage is then applied depending on the total of the roll; if the total of the roll is equal to or greater than the DC, half damage will be applied, otherwise the full damage will be applied. This again respects resistances, immunities, and vulnerabilities.
+
+Any button that applies damage can be shift-clicked to apply the same amount as healing instead.
 
 ### Example
 The below example shows the quick-application of a fireball's damage using some of the tools this module has available.
