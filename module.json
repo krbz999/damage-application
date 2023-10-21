@@ -1,7 +1,7 @@
 {
   "id": "damage-application",
   "title": "Damage Application",
-  "version": "11.0.6",
+  "version": "11.0.7",
   "authors": [
     {
       "name": "Zhell",
@@ -43,5 +43,5 @@
   "url": "https://github.com/krbz999/damage-application",
   "license": "https://raw.githubusercontent.com/krbz999/damage-application/main/LICENSE",
   "manifest": "https://github.com/krbz999/damage-application/releases/latest/download/module.json",
-  "download": "https://github.com/krbz999/damage-application/releases/download/v11.0.6/module.zip"
+  "download": "https://github.com/krbz999/damage-application/releases/download/v11.0.7/module.zip"
 }

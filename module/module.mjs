@@ -282,9 +282,9 @@ export class DamageApplicator extends Application {
    * @returns {Promise<Actor5e>}
    */
   async _undoDamageToActor(uuid) {
-    const {clone, saved} = this.actorData[uuid];
+    const {actor, clone, saved} = this.actorData[uuid];
     const {values, bypasses} = this.model;
-    return DamageApplicator.undoDamage(clone, values, bypasses, !!saved);
+    return DamageApplicator.undoDamage(actor, values, bypasses, !!saved, clone.system.traits);
   }
 
   /**
@@ -495,13 +495,14 @@ export class DamageApplicator extends Application {
    * @param {object} values                             An object with damage types as keys and their totals.
    * @param {Set<string>} [passes]                      An array of properties that bypass traits.
    * @param {boolean} [half=false]                      Should the values be halved?
+   * @param {object} [traits=null]                      An object of actor damage traits to use instead.
    * @returns {object<total:number, values:object>}     The total damage taken (or healing granted), and modified values.
    */
-  static calculateDamage(actor, values, passes, half = false) {
+  static calculateDamage(actor, values, passes, half = false, traits=null) {
     passes ??= new Set();
     values = foundry.utils.deepClone(values);
     const {dr, di, dv} = ["dr", "di", "dv"].reduce((acc, d) => {
-      const trait = actor.system.traits[d];
+      const trait = traits ? traits[d] : actor.system.traits[d];
       const types = new Set(trait.value);
       const bypasses = trait.bypasses.filter(b => passes.has(b));
       if (trait.custom?.length) for (const val of trait.custom.split(";")) {
