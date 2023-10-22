@@ -40,6 +40,12 @@
       "path": "languages/en.json"
     }
   ],
+  "flags": {
+    "hotReload": {
+      "extensions": ["css"],
+      "paths": ["module/module.css"]
+    }
+  },
   "url": "https://github.com/krbz999/damage-application",
   "license": "https://raw.githubusercontent.com/krbz999/damage-application/main/LICENSE",
   "manifest": "https://github.com/krbz999/damage-application/releases/latest/download/module.json",
