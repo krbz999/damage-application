@@ -1,6 +1,5 @@
 /* DAMAGE APPLICATION */
 .damage-application.app {
-  /*opacity: 1;*/
   transition: opacity 500ms;
 }
 .damage-application.app.fade {
@@ -44,6 +43,10 @@
 .damage-application.app .buttons {
   display: flex;
   gap: 0.5em;
+}
+.damage-application.app .notes {
+  font-style: italic;
+  margin: 0.5em 1em 0 1em;
 }
 
 /* Actor section */

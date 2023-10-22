@@ -59,6 +59,7 @@ export class DamageApplicator extends Application {
     const messageData = foundry.utils.deepClone(this.message.flags[DamageApplicator.MODULE]);
     this.hasSave = messageData.damage.hasSave;
     this.saveData = messageData.damage.saveData;
+    this.isCantrip = messageData.damage.isCantrip;
 
     // Data model.
     this.model = new (class DamageApplicationModel extends foundry.abstract.TypeDataModel {
@@ -120,6 +121,7 @@ export class DamageApplicator extends Application {
     data.total = Object.values(this.model.values).reduce((acc, v) => acc + v, 0);
 
     // Item data.
+    data.isCantrip = this.isCantrip;
     data.hasSave = this.hasSave;
     if (data.hasSave) {
       data.save = {
@@ -151,8 +153,8 @@ export class DamageApplicator extends Application {
       data.hp = actor.system.attributes.hp;
       data.actorUuid = uuid;
       data.saved ??= null;
-      data.savedCssClass = data.saved ? "success" : data.saved === false ? "failure" : "";
-      data.saveIcon = data.saved === null ? "fa-person-falling-burst" : data.saved ? "fa-check" : "fa-times";
+      data.savedCssClass = data.saved ? "success" : (data.saved === false) ? "failure" : "";
+      data.saveIcon = (data.saved === null) ? "fa-person-falling-burst" : data.saved ? "fa-check" : "fa-times";
       ["dr", "di", "dv"].forEach(d => {
         data[d] = [];
         for (const value of actor.system.traits[d].value) {
@@ -294,6 +296,7 @@ export class DamageApplicator extends Application {
    */
   async _applyDamageToActor(uuid) {
     const {actor, clone, saved} = this.actorData[uuid];
+    if (saved && this.isCantrip) return actor;
     const {values, bypasses} = this.model;
     const {total: damage, values: totals} = this.constructor.calculateDamage(clone, values, bypasses, !!saved);
     return DamageApplicator._protoApplyDamage.call(actor, totals);
@@ -400,11 +403,11 @@ export class DamageApplicator extends Application {
    * @returns {Promise<void>}
    */
   static async _quickSaveAndApply(event) {
-    const {bypasses, saveData, values} = this._getDataFromDamageRoll(event);
+    const {bypasses, saveData, values, isCantrip} = this._getDataFromDamageRoll(event);
     const actors = this._getActors();
     for (const actor of actors) {
       const saved = await this.rollAbilitySave(actor, saveData.ability, saveData.dc, {event});
-      if (saved === null) continue;
+      if ((saved === null) || (isCantrip && saved)) continue;
       await this.applyDamage(actor, values, bypasses, saved);
     }
   }
@@ -480,13 +483,13 @@ export class DamageApplicator extends Application {
    * @param {object} values               An object with damage types as keys and their totals.
    * @param {Set<string>} [bypasses]      Strings of bypass weapon properties.
    * @param {boolean} [half=false]        Whether to halve the damage.
+   * @param {object} [traits=null]                      An object of actor damage traits to use instead.
    * @returns {Promise<Actor5e>}
    */
-  static async undoDamage(actor, values, bypasses, half = false) {
+  static async undoDamage(actor, values, bypasses, half = false, traits = null) {
     bypasses ??= new Set();
-    const {total, values: totals} = this.calculateDamage(actor, values, bypasses, half);
-    const adjustment = (half && ((total % 2) === 1)) ? -0.5 : 0;
-    return actor.applyDamage(total + adjustment, -1);
+    const {total, values: totals} = this.calculateDamage(actor, values, bypasses, half, traits);
+    return actor.applyDamage(total, -1);
   }
 
   /**
@@ -498,7 +501,7 @@ export class DamageApplicator extends Application {
    * @param {object} [traits=null]                      An object of actor damage traits to use instead.
    * @returns {object<total:number, values:object>}     The total damage taken (or healing granted), and modified values.
    */
-  static calculateDamage(actor, values, passes, half = false, traits=null) {
+  static calculateDamage(actor, values, passes, half = false, traits = null) {
     passes ??= new Set();
     values = foundry.utils.deepClone(values);
     const {dr, di, dv} = ["dr", "di", "dv"].reduce((acc, d) => {
@@ -675,7 +678,8 @@ export class DamageApplicator extends Application {
       indices: indices,
       bypasses: bypasses.concat(ammoBypasses),
       hasSave: item.hasSave,
-      saveData: item.system.save
+      saveData: item.system.save,
+      isCantrip: (item.type === "spell") && (item.system.level === 0)
     };
   }
 
@@ -806,6 +810,7 @@ export class DamageApplicator extends Application {
    */
   static async _displayScrollingDamage(token, values) {
     if (!token.visible || !token.renderable) return;
+    const px = Math.round(canvas.grid.size * 0.25);
     for (const type in values) {
       const amt = values[type] ? (-values[type].signedString()) : "0";
       const pct = Math.clamped(amt / token.actor.system.attributes.hp.max, 0, 1);
@@ -816,7 +821,7 @@ export class DamageApplicator extends Application {
         stroke: 0x000000,
         strokeThickness: 1,
         jitter: 2,
-        fontSize: 16 + (32 * pct)
+        fontSize: px + ((2 * px) * pct)
       });
       await new Promise(r => setTimeout(r, 150));
     }

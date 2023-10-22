@@ -19,6 +19,9 @@
       </button>
       {{/if}}
     </div>
+    {{#if (and hasSave isCantrip)}}
+    <p class="notes">{{localize "DAMAGE_APP.NoDamageOnSaveVersusCantrip"}}</p>
+    {{/if}}
   </div>
 
   <div class="actor-section">
