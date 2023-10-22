@@ -456,7 +456,7 @@ export class DamageApplicator extends Application {
   static async rollAbilitySave(actor, ability, targetValue, options = {}) {
     if (!this.canDamageActor(actor)) return null;
     const token = actor.token?.object ?? actor.getActiveTokens()[0];
-    if (token) canvas.animatePan({...token.center, duration: 1000});
+    if (token && !(("event" in options) && options.event.shiftKey)) canvas.animatePan({...token.center, duration: 1000});
     const roll = await actor.rollAbilitySave(ability, {targetValue, ...options});
     if (!roll) return null;
     return roll.total >= targetValue;
