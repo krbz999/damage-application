@@ -160,23 +160,18 @@ export class DamageApplicator extends Application {
         for (const value of actor.system.traits[d].value) {
           if (!(value in CONFIG.DND5E.damageTypes) || !types.includes(value)) continue;
 
-          // Is this type invalid due to being a physical damage type and bypassed?
+          // Is this type irrelevant due to being a physical damage type and bypassed?
           const isPhysical = value in CONFIG.DND5E.physicalDamageTypes;
-          const attackBypasses = this.model.bypasses;
           const actorBypasses = actor.system.traits[d].bypasses;
-          if (isPhysical && attackBypasses.size && actorBypasses.size && attackBypasses.intersects(actorBypasses)) continue;
+          if (isPhysical && this.model.bypasses.intersects(actorBypasses)) continue;
 
-
+          // For display purposes, is this trait conditional?
           const bypass = isPhysical && (actorBypasses.size > 0);
-          let label;
-          if (bypass) {
-            label = game.i18n.format("DND5E.DamagePhysicalBypasses", {
-              damageTypes: CONFIG.DND5E.damageTypes[value],
-              bypassTypes: [...actorBypasses.map(p => CONFIG.DND5E.physicalWeaponProperties[p])].filterJoin(", ")
-            });
-          } else {
-            label = CONFIG.DND5E.damageTypes[value]
-          }
+
+          const label = bypass ? game.i18n.format("DND5E.DamagePhysicalBypasses", {
+            damageTypes: CONFIG.DND5E.damageTypes[value],
+            bypassTypes: [...actorBypasses.map(p => CONFIG.DND5E.physicalWeaponProperties[p])].filterJoin(", ")
+          }) : CONFIG.DND5E.damageTypes[value];
           data[d].push({
             key: value,
             bypass: bypass,
@@ -626,11 +621,11 @@ export class DamageApplicator extends Application {
     div.querySelectorAll("[data-action]").forEach(n => {
       const action = n.dataset.action;
       if (action === "render") n.addEventListener("click", app.create.bind(app, message));
-      else if (action === "quick-apply") n.addEventListener("click", app._quickApply.bind(app));
-      else if (action === "save-and-apply") n.addEventListener("click", app._quickSaveAndApply.bind(app));
-      else if (action === "quick-apply-half") n.addEventListener("click", app._quickApplyHalf.bind(app));
-      else if (action === "quick-apply-temphp") n.addEventListener("click", app._quickApplyTempHP.bind(app));
-      else if (action === "quick-apply-healing") n.addEventListener("click", app._quickApplyHealing.bind(app));
+      else if (action === "damage") n.addEventListener("click", app._quickApply.bind(app));
+      else if (action === "save") n.addEventListener("click", app._quickSaveAndApply.bind(app));
+      else if (action === "half") n.addEventListener("click", app._quickApplyHalf.bind(app));
+      else if (action === "temphp") n.addEventListener("click", app._quickApplyTempHP.bind(app));
+      else if (action === "healing") n.addEventListener("click", app._quickApplyHealing.bind(app));
     });
     roll.after(div.firstElementChild);
   }
