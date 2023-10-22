@@ -810,11 +810,13 @@ export class DamageApplicator extends Application {
    */
   static async _displayScrollingDamage(token, values) {
     if (!token.visible || !token.renderable) return;
-    const px = Math.round(canvas.grid.size * 0.25);
+    const px = Math.round(canvas.grid.size * 0.15);
+    const hp = token.actor.system.attributes.hp.max;
+    const origin = token.center;
     for (const type in values) {
       const amt = values[type] ? (-values[type].signedString()) : "0";
-      const pct = Math.clamped(amt / token.actor.system.attributes.hp.max, 0, 1);
-      canvas.interface.createScrollingText(token.center, amt, {
+      const pct = Math.clamped(amt / hp, 0, 1);
+      canvas.interface.createScrollingText(origin, amt, {
         duration: 2000,
         anchor: CONST.TEXT_ANCHOR_POINTS.TOP,
         fill: DamageApplicator.COLORS[type] ?? CONFIG.DND5E.tokenHPColors.damage,
