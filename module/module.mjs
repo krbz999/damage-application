@@ -456,7 +456,8 @@ export class DamageApplicator extends Application {
   static async rollAbilitySave(actor, ability, targetValue, options = {}) {
     if (!this.canDamageActor(actor)) return null;
     const token = actor.token?.object ?? actor.getActiveTokens()[0];
-    if (token && !(("event" in options) && options.event.shiftKey)) canvas.animatePan({...token.center, duration: 1000});
+    const pan = token && !CONFIG.Dice.D20Roll.determineAdvantageMode(options).isFF;
+    if (pan) canvas.animatePan({...token.center, duration: 1000});
     const roll = await actor.rollAbilitySave(ability, {targetValue, ...options});
     if (!roll) return null;
     return roll.total >= targetValue;
@@ -483,7 +484,7 @@ export class DamageApplicator extends Application {
    * @param {object} values               An object with damage types as keys and their totals.
    * @param {Set<string>} [bypasses]      Strings of bypass weapon properties.
    * @param {boolean} [half=false]        Whether to halve the damage.
-   * @param {object} [traits=null]                      An object of actor damage traits to use instead.
+   * @param {object} [traits=null]        An object of actor damage traits to use instead.
    * @returns {Promise<Actor5e>}
    */
   static async undoDamage(actor, values, bypasses, half = false, traits = null) {
@@ -507,7 +508,7 @@ export class DamageApplicator extends Application {
     const {dr, di, dv} = ["dr", "di", "dv"].reduce((acc, d) => {
       const trait = traits ? traits[d] : actor.system.traits[d];
       const types = new Set(trait.value);
-      const bypasses = trait.bypasses.filter(b => passes.has(b));
+      const bypasses = trait.bypasses.intersection(passes);
       if (trait.custom?.length) for (const val of trait.custom.split(";")) {
         const t = val.trim();
         if (t in values) types.add(t);
