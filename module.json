@@ -1,7 +1,7 @@
 {
   "id": "damage-application",
   "title": "Damage Application",
-  "version": "11.0.8",
+  "version": "11.1.0",
   "authors": [
     {
       "name": "Zhell",
@@ -28,7 +28,7 @@
         "id": "dnd5e",
         "type": "system",
         "compatibility": {
-          "minimum": "2.3.0"
+          "minimum": "2.3.1"
         }
       }
     ]
@@ -49,5 +49,5 @@
   "url": "https://github.com/krbz999/damage-application",
   "license": "https://raw.githubusercontent.com/krbz999/damage-application/main/LICENSE",
   "manifest": "https://github.com/krbz999/damage-application/releases/latest/download/module.json",
-  "download": "https://github.com/krbz999/damage-application/releases/download/v11.0.8/module.zip"
+  "download": "https://github.com/krbz999/damage-application/releases/download/v11.1.0/module.zip"
 }
