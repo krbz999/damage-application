@@ -1,3 +1,5 @@
+Interested in following along with development of any of my modules? Join the [Discord server](https://discord.gg/QAG8eWABGT). 
+
 # Damage Application
 
 This module, for the dnd5e system enhances the default damage rolls to allow players and GMs to apply damage, healing, and temporary hit points even faster. All damage will respect resistances, immunities, and vulnerabilities.
