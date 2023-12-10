@@ -28,7 +28,9 @@
         "id": "dnd5e",
         "type": "system",
         "compatibility": {
-          "minimum": "2.3.1"
+          "minimum": "2.3.1",
+          "maximum": "2.4.9",
+          "verified": "2.4.1"
         }
       }
     ]
