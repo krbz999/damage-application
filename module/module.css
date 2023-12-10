@@ -100,6 +100,21 @@
 .damage-application.app .actor .header .hasPlayer {
   font-style: italic;
 }
+.damage-application.app .actor .header .health-bar {
+  width: 90%;
+  position: relative;
+  border: 1px groove black;
+  height: 10px;
+  margin: 3px 5px 0 5px;
+  border-radius: 5px;
+  overflow: hidden;
+}
+.damage-application.app .actor .header .health-bar .bar {
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+}
 .damage-application.app :is(.trait-section, .functions) {
   padding: 0 0.5em;
   display: flex;

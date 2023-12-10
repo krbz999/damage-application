@@ -38,6 +38,9 @@
           <span data-attr="hp-tempmax">{{#if hp.tempmax}}(+{{hp.tempmax}}){{/if}}</span>
         </div>
         {{#if hasPlayer}}<div class="hasPlayer">({{localize "DAMAGE_APP.PlayerOwned"}})</div>{{/if}}
+        <div class="health-bar">
+          <div class="bar" style="width: {{healthPct}}%; background-color: {{healthColor}}"></div>
+        </div>
       </div>
 
       <div class="trait-section">

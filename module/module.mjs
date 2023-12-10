@@ -83,6 +83,7 @@ export class DamageApplicator extends Application {
     })({values: messageData.damage.values, bypasses: messageData.damage.bypasses});
 
     this.model.prepareDerivedData();
+    this._saveHealthPositions = foundry.utils.debounce(this.#saveHealthPositions, 500);
   }
 
   /** @override */
@@ -143,14 +144,19 @@ export class DamageApplicator extends Application {
       this.actorData ??= {};
 
       const data = this.actorData[uuid] ??= {};
-
       const clone = data.clone ??= actor.clone({}, {keepId: true});
+      const hp = actor.system.attributes.hp;
+      const curr = hp.value + hp.temp;
+      const max = hp.max + hp.tempmax;
+
       data.actor = actor;
       data.img = actor.img;
       data.name = actor.name.split(" ")[0].trim();
       data.actorName = actor.name;
       data.hasPlayer = game.users.some(user => !user.isGM && user.active && actor.testUserPermission(user, "OWNER"));
-      data.hp = actor.system.attributes.hp;
+      data.hp = hp;
+      data.healthPct = Math.clamped(Math.round(curr / max * 100), 0, 100);
+      data.healthColor = Actor.implementation.getHPColor(curr, max).css;
       data.actorUuid = uuid;
       data.saved ??= null;
       data.savedCssClass = data.saved ? "success" : (data.saved === false) ? "failure" : "";
@@ -223,6 +229,49 @@ export class DamageApplicator extends Application {
     for (const actor of this.actors) actor.apps[this.id] = this;
     this.model.prepareDerivedData();
     return super.render(force, options);
+  }
+
+  /** @override */
+  _saveScrollPositions(html) {
+    super._saveScrollPositions(html);
+    if (!this._healthPositions) this.#saveHealthPositions(html);
+    else this._saveHealthPositions(html);
+  }
+
+  /**
+   * Save the width of health bars.
+   * @param {HTMLElement} html      The application's html.
+   */
+  #saveHealthPositions([html]) {
+    this._healthPositions = {};
+    for (const actor of html.querySelectorAll("[data-actor-uuid]")) {
+      const uuid = actor.dataset.actorUuid;
+      const bar = actor.querySelector(".health-bar .bar");
+      if (!bar) continue;
+      this._healthPositions[uuid] = bar.style.width;
+    }
+  }
+
+  /** @override */
+  _restoreScrollPositions(html) {
+    super._restoreScrollPositions(html);
+    this._restoreHealthPositions(html);
+  }
+
+  /**
+   * Animate the width of health bars.
+   * @param {HTMLElement} html      The application's html.
+   */
+  _restoreHealthPositions([html]) {
+    const w = this._healthPositions;
+    if (!w) return;
+    for (const uuid in w) {
+      const bar = html.querySelector(`[data-actor-uuid="${uuid}"] .health-bar .bar`);
+      if (!bar) continue;
+      const frames = [{width: w[uuid], easing: "ease"}, {width: bar.style.width}];
+      const duration = 750;
+      bar.animate(frames, duration);
+    }
   }
 
   /** @override */
