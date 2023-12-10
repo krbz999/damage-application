@@ -598,7 +598,7 @@ export class DamageApplicator extends Application {
   /* -------------------------------------- */
 
   /**
-   * Append button(s) to damage rolls.
+   * Append button(s) to damage rolls. Hooks on 'renderChatMessage'.
    * @param {ChatMessage} message     The message being rendered.
    * @param {HTMLElement} html        The rendered html element.
    */
@@ -643,20 +643,23 @@ export class DamageApplicator extends Application {
   }
 
   /**
-   * Append damage type and bypass properties to a damage roll message.
-   * @param {Item} item         The item rolling damage.
-   * @param {object} config     The configuration object for the damage roll.
+   * Append damage type and bypass properties to a damage roll message. Hooks on 'dnd5e.preRollDamage'.
+   * @param {Item|void} item      The item rolling damage. This may be undefined.
+   * @param {object} config       The configuration object for the damage roll.
    */
   static _appendDamageRollData(item, config) {
-    const parts = item.system.damage.parts;
+    const parts = item?.system.damage.parts;
     const indices = {};
-    const ammo = config.data.ammo ? item.actor.items.get(item.system.consume.target) : null;
+    const ammo = config.data?.ammo ? item.actor.items.get(item.system.consume.target) : null;
     const ammoParts = ammo ? ammo.system.damage.parts : [];
-    const hasProps = ["ammo", "weapon"].includes(item.type);
+    const hasProps = ["ammo", "weapon"].includes(item?.type);
+    const data = config.event?.target?.closest(".roll-link")?.dataset; // Dataset for damage roll enrichers.
+    const damageParts = item ? parts.concat(ammoParts) : config.parts.map(p => [p, data.damageType || "none"]);
+    const rollData = item ? config.data : {};
 
     let idx = 0;
-    for (const [formula, type] of parts.concat(ammoParts)) {
-      const terms = new CONFIG.Dice.DamageRoll(formula, config.data).terms;
+    for (const [formula, type] of damageParts) {
+      const terms = new CONFIG.Dice.DamageRoll(formula, rollData).terms;
       for (const term of terms) {
         if ((term instanceof Die) || (term instanceof NumericTerm) || (term instanceof MathTerm)) indices[idx] = type;
 
@@ -667,20 +670,21 @@ export class DamageApplicator extends Application {
       }
     }
 
-    const bypasses = hasProps ? Object.keys(CONFIG.DND5E.physicalWeaponProperties).filter(p => item.system.properties[p]) : [];
-    const ammoBypasses = ammo ? Object.keys(CONFIG.DND5E.physicalWeaponProperties).filter(p => ammo.system.properties[p]) : [];
+    const keys = Object.keys(CONFIG.DND5E.physicalWeaponProperties);
+    const bypasses = hasProps ? keys.filter(p => item.system.properties[p]) : [];
+    const ammoBypasses = ammo ? keys.filter(p => ammo.system.properties[p]) : [];
 
     config.messageData[`flags.${DamageApplicator.MODULE}.damage`] = {
       indices: indices,
       bypasses: bypasses.concat(ammoBypasses),
-      hasSave: item.hasSave,
-      saveData: item.system.save,
-      isCantrip: (item.type === "spell") && (item.system.level === 0)
+      hasSave: item?.hasSave ?? false,
+      saveData: item?.system.save ?? {},
+      isCantrip: !!item && (item.type === "spell") && (item.system.level === 0)
     };
   }
 
   /**
-   * Append more properties after the roll has been thrown into chat.
+   * Append more properties after the roll has been thrown into chat. Hooks on 'preCreateChatMessage'.
    * @param {ChatMessage} message     The message being posted in chat.
    */
   static _appendMoreDamageRollData(message) {
