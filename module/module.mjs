@@ -710,7 +710,7 @@ export class DamageApplicator extends Application {
     for (const [formula, type] of damageParts) {
       const terms = new CONFIG.Dice.DamageRoll(formula, rollData).terms;
       for (const term of terms) {
-        if ((term instanceof Die) || (term instanceof NumericTerm) || (term instanceof MathTerm)) indices[idx] = type;
+        if ([Die, NumericTerm, MathTerm, ParentheticalTerm].some(t => term instanceof t)) indices[idx] = type;
 
         // Is the next term an actual new term, math-wise?
         const nextTerm = terms[terms.indexOf(term) + 1];
