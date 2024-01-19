@@ -27,7 +27,12 @@
   <div class="actor-section">
     {{#each actors}}
     <div class="actor" data-actor-uuid="{{actorUuid}}">
-      <img src="{{img}}" data-tooltip="{{name}}" data-action="render-actor">
+      <div class="portrait">
+        <img src="{{img}}" data-tooltip="{{name}}" data-action="render-actor">
+        {{#if isTarget}}
+        <i class="fa-solid fa-bullseye" data-tooltip="DAMAGE_APP.TargetedTokenHint"></i>
+        {{/if}}
+      </div>
       <div class="header">
         <a class="name" data-tooltip="{{actorName}}" data-action="render-actor">{{name}}</a>
         <div class="hp-section">

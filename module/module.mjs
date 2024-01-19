@@ -2,7 +2,7 @@
  * An application that takes selected tokens, and lets you roll saving
  * throws and apply damage correctly via a the interface.
  */
-export class DamageApplicator extends Application {
+class DamageApplicator extends Application {
   /**
    * The module's id.
    * @type {string}
@@ -52,14 +52,15 @@ export class DamageApplicator extends Application {
     // The initiating damage roll.
     this.message = message;
 
-    // Set token actors depending on user status.
-    this.actors = this.constructor._getActors();
-
     // The damage types and the bypasses (mgc, ada, sil).
     const messageData = foundry.utils.deepClone(this.message.flags[DamageApplicator.MODULE]);
     this.hasSave = messageData.damage.hasSave;
     this.saveData = messageData.damage.saveData;
     this.isCantrip = messageData.damage.isCantrip;
+    this.targetTokens = messageData.damage.targets || [];
+
+    // Set token actors depending on user status.
+    this.actors = this.constructor._getActors(this.targetTokens);
 
     // Data model.
     this.model = new (class DamageApplicationModel extends foundry.abstract.TypeDataModel {
@@ -154,6 +155,7 @@ export class DamageApplicator extends Application {
       data.name = actor.name.split(" ")[0].trim();
       data.actorName = actor.name;
       data.hasPlayer = game.users.some(user => !user.isGM && user.active && actor.testUserPermission(user, "OWNER"));
+      data.isTarget = this.targetTokens.some(id => canvas.scene.tokens.get(id)?.actor?.uuid === uuid);
       data.hp = hp;
       data.healthPct = Math.clamped(Math.round(curr / max * 100), 0, 100);
       data.healthColor = Actor.implementation.getHPColor(curr, max).css;
@@ -217,7 +219,7 @@ export class DamageApplicator extends Application {
   }
 
   /** @override */
-  async render(force = false, options = {}) {
+  render(force = false, options = {}) {
     if (force) {
       options.top = 150;
       options.left = 150;
@@ -397,9 +399,10 @@ export class DamageApplicator extends Application {
 
   /**
    * Helper method to get actors from selected or assigned tokens.
+   * @param {string[]} [tokenIds]     An optional array of token ids.
    * @returns {Set<Actor5e>}
    */
-  static _getActors() {
+  static _getActors(tokenIds=[]) {
     const selected = canvas.tokens.controlled;
     let tokens;
     if (game.user.isGM || selected.length) tokens = selected;
@@ -410,6 +413,11 @@ export class DamageApplicator extends Application {
       if (actor && actor.system.attributes?.hp) acc.add(actor);
       return acc;
     }, new Set());
+
+    if (game.user.isGM) tokenIds.forEach(id => {
+      const actor = canvas.scene.tokens.get(id)?.actor;
+      if (actor) actors.add(actor);
+    });
 
     return actors;
   }
@@ -728,7 +736,8 @@ export class DamageApplicator extends Application {
       bypasses: bypasses.concat(ammoBypasses),
       hasSave: item?.hasSave ?? false,
       saveData: item?.system.save ?? {},
-      isCantrip: !!item && (item.type === "spell") && (item.system.level === 0)
+      isCantrip: !!item && (item.type === "spell") && (item.system.level === 0),
+      targets: Array.from(game.user.targets.map(t => t.id))
     };
   }
 
