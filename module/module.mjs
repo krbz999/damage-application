@@ -116,7 +116,7 @@ class DamageApplicator extends Application {
 
     // Damage roll data.
     data.types = Object.entries(this.model.values).reduce((acc, [type, value]) => {
-      const label = CONFIG.DND5E.damageTypes[type] ?? CONFIG.DND5E.healingTypes[type];
+      const label = CONFIG.DND5E.damageTypes[type]?.label ?? CONFIG.DND5E.healingTypes[type]?.label;
       if (label) acc.push({type: type, value: value, label: label});
       return acc;
     }, []);
@@ -165,21 +165,24 @@ class DamageApplicator extends Application {
       data.saveIcon = (data.saved === null) ? "fa-person-falling-burst" : data.saved ? "fa-check" : "fa-times";
       ["dr", "di", "dv"].forEach(d => {
         data[d] = [];
+        const itemProps = CONFIG.DND5E.itemProperties;
         for (const value of actor.system.traits[d].value) {
           if (!(value in CONFIG.DND5E.damageTypes) || !types.includes(value)) continue;
 
+          const dtype = CONFIG.DND5E.damageTypes[value];
+
           // Is this type irrelevant due to being a physical damage type and bypassed?
-          const isPhysical = value in CONFIG.DND5E.physicalDamageTypes;
-          const actorBypasses = actor.system.traits[d].bypasses;
+          const isPhysical = dtype.isPhysical ?? false;
+          const actorBypasses = actor.system.traits[d].bypasses.filter(k => itemProps[k]?.isPhysical);
           if (isPhysical && this.model.bypasses.intersects(actorBypasses)) continue;
 
           // For display purposes, is this trait conditional?
           const bypass = isPhysical && (actorBypasses.size > 0);
 
           const label = bypass ? game.i18n.format("DND5E.DamagePhysicalBypasses", {
-            damageTypes: CONFIG.DND5E.damageTypes[value],
-            bypassTypes: [...actorBypasses.map(p => CONFIG.DND5E.physicalWeaponProperties[p])].filterJoin(", ")
-          }) : CONFIG.DND5E.damageTypes[value];
+            damageTypes: dtype.label,
+            bypassTypes: [...actorBypasses.map(p => itemProps[p].label)].filterJoin(", ")
+          }) : dtype.label;
           data[d].push({
             key: value,
             bypass: bypass,
@@ -402,7 +405,7 @@ class DamageApplicator extends Application {
    * @param {string[]} [tokenIds]     An optional array of token ids.
    * @returns {Set<Actor5e>}
    */
-  static _getActors(tokenIds=[]) {
+  static _getActors(tokenIds = []) {
     const selected = canvas.tokens.controlled;
     let tokens;
     if (game.user.isGM || selected.length) tokens = selected;
@@ -566,7 +569,7 @@ class DamageApplicator extends Application {
         if (t in values) types.add(t);
       }
       for (const type of types) if (type in values) acc[d].push({
-        key: type, bypass: !!CONFIG.DND5E.physicalDamageTypes[type] && (bypasses.size > 0)
+        key: type, bypass: !!CONFIG.DND5E.damageTypes[type]?.isPhysical && (bypasses.size > 0)
       });
       return acc;
     }, {dr: [], di: [], dv: []});
@@ -727,13 +730,16 @@ class DamageApplicator extends Application {
       }
     }
 
-    const keys = Object.keys(CONFIG.DND5E.physicalWeaponProperties);
-    const bypasses = hasProps ? keys.filter(p => item.system.properties[p]) : [];
-    const ammoBypasses = ammo ? keys.filter(p => ammo.system.properties[p]) : [];
+    const physicalKeys = Object.entries(CONFIG.DND5E.itemProperties).reduce((acc, [k, v]) => {
+      if (v.isPhysical) acc.add(k);
+      return acc;
+    }, new Set());
+    const bypasses = hasProps ? physicalKeys.intersection(item.system.properties) : new Set();
+    const ammoBypasses = ammo ? physicalKeys.intersection(ammo.system.properties) : new Set();
 
     config.messageData[`flags.${DamageApplicator.MODULE}.damage`] = {
       indices: indices,
-      bypasses: bypasses.concat(ammoBypasses),
+      bypasses: [...bypasses.union(ammoBypasses)],
       hasSave: item?.hasSave ?? false,
       saveData: item?.system.save ?? {},
       isCantrip: !!item && (item.type === "spell") && (item.system.level === 0),
@@ -811,10 +817,11 @@ class DamageApplicator extends Application {
     if (!flavor) return false;
     const lower = flavor.toLowerCase();
     const types = CONFIG.DND5E.damageTypes;
+    const labels = Object.values(types).map(k => k.label);
     if (flavor in types) return flavor;
     else if (lower in types) return lower;
-    else if (Object.values(types).includes(flavor)) return Object.keys(types).find(k => types[k] === flavor);
-    else if (Object.values(types).includes(lower)) return Object.keys(types).find(k => types[k] === lower);
+    else if (labels.includes(flavor)) return Object.keys(types).find(k => types[k].label === flavor);
+    else if (labels.includes(lower)) return Object.keys(types).find(k => types[k].label === lower);
     else return false;
   }
 
