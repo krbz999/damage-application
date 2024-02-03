@@ -10,6 +10,7 @@
   "DAMAGE_APP.FindToken": "Find Token",
   "DAMAGE_APP.ManualApplication": "Manual Application",
   "DAMAGE_APP.NoDamageOnSaveVersusCantrip": "Actors will not be taking any damage on a successful save against a cantrip.",
+  "DAMAGE_APP.NoRelevantTraits": "This actor has no relevant traits.",
   "DAMAGE_APP.PlayerOwned": "Player-owned",
   "DAMAGE_APP.SaveAndApplyDamage": "Save and Apply Damage",
   "DAMAGE_APP.SavingThrow": "DC {dc} {label}",

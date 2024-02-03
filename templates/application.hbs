@@ -1,13 +1,13 @@
 <div class="content">
 
-  <div class="message-section">
-    <form class="damage-types">
+  <form class="message-section">
+    <div class="damage-types">
       {{#each types}}
       <div class="type">
         <label>{{label}}</label> <input type="number" name="values.{{type}}" data-key="{{type}}" value="{{value}}">
       </div>
       {{/each}}
-    </form>
+    </div>
     <div class="damage-total">{{localize "DAMAGE_APP.Total" total=total}}</div>
     <div class="buttons">
       <button data-action="apply-damage-all">
@@ -22,7 +22,7 @@
     {{#if (and hasSave isCantrip)}}
     <p class="notes">{{localize "DAMAGE_APP.NoDamageOnSaveVersusCantrip"}}</p>
     {{/if}}
-  </div>
+  </form>
 
   <div class="actor-section">
     {{#each actors}}
@@ -72,6 +72,9 @@
           <div class="trait-label">{{localize "DAMAGE_APP.TraitVulnerability"}}</div>
         </a>
         {{/each}}
+        {{/if}}
+        {{#if noTraits}}
+        <span class="no-traits">{{localize "DAMAGE_APP.NoRelevantTraits"}}</span>
         {{/if}}
       </div>
 

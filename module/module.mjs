@@ -2,7 +2,7 @@
  * An application that takes selected tokens, and lets you roll saving
  * throws and apply damage correctly via a the interface.
  */
-class DamageApplicator extends Application {
+class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   /**
    * The module's id.
    * @type {string}
@@ -32,32 +32,40 @@ class DamageApplicator extends Application {
   /** Initialize module. */
   static init() {
     Hooks.on("renderChatMessage", DamageApplicator._appendToDamageRolls);
-    Hooks.on("dnd5e.preRollDamage", DamageApplicator._appendDamageRollData);
-    Hooks.on("preCreateChatMessage", DamageApplicator._appendMoreDamageRollData);
+    Hooks.on("dnd5e.preRollDamage", DamageApplicator._preRollDamage.bind(DamageApplicator));
     game.modules.get(DamageApplicator.MODULE).api = DamageApplicator;
     DamageApplicator._registerSettings();
     Hooks.once("ready", function() {
       if (!game.settings.get(DamageApplicator.MODULE, "colors")) return;
-      Hooks.on("preUpdateActor", DamageApplicator._preUpdateActor);
       Hooks.on("updateActor", DamageApplicator._updateActor);
+      Hooks.on("dnd5e.preCalculateDamage", function(actor, damages, options) {
+        options[DamageApplicator.MODULE] = {damages};
+      });
+      Hooks.on("dnd5e.preApplyDamage", function(actor, amount, updates, options){
+        if (amount > 0 && options[DamageApplicator.MODULE]?.damages) {
+          actor.update(updates, options);
+          return false;
+        }
+      });
     });
   }
 
   /**
    * @constructor
-   * @param {ChatMessage} message
+   * @param {ChatMessage} message     The chat message.
+   * @param {object} data             Data retrieved from the chat message.
+   * @param {object} [options]        Rendering options.
    */
-  constructor(message) {
+  constructor(message, data, options={}) {
     super();
     // The initiating damage roll.
     this.message = message;
 
     // The damage types and the bypasses (mgc, ada, sil).
-    const messageData = foundry.utils.deepClone(this.message.flags[DamageApplicator.MODULE]);
-    this.hasSave = messageData.damage.hasSave;
-    this.saveData = messageData.damage.saveData;
-    this.isCantrip = messageData.damage.isCantrip;
-    this.targetTokens = messageData.damage.targets || [];
+    this.hasSave = data.hasSave;
+    this.saveData = data.saveData;
+    this.isCantrip = data.isCantrip;
+    this.targetTokens = data.targets;
 
     // Set token actors depending on user status.
     this.actors = this.constructor._getActors(this.targetTokens);
@@ -81,7 +89,7 @@ class DamageApplicator extends Application {
         for (const key in this.values) if (!this.values[key]) delete this.values[key];
       }
 
-    })({values: messageData.damage.values, bypasses: messageData.damage.bypasses});
+    })({values: data.values, bypasses: [...data.properties]});
 
     this.model.prepareDerivedData();
     this._saveHealthPositions = foundry.utils.debounce(this.#saveHealthPositions, 500);
@@ -90,7 +98,7 @@ class DamageApplicator extends Application {
   /** @override */
   static get defaultOptions() {
     return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: [DamageApplicator.MODULE],
+      classes: [DamageApplicator.MODULE, "dnd5e2", "dialog"],
       template: "modules/damage-application/templates/application.hbs",
       width: 620
     });
@@ -194,6 +202,7 @@ class DamageApplicator extends Application {
       data.hasResistance = data.dr.length > 0;
       data.hasInvulnerability = data.di.length > 0;
       data.hasVulnerability = data.dv.length > 0;
+      data.noTraits = !data.hasResistance && !data.hasInvulnerability && !data.hasVulnerability;
     }
   }
 
@@ -347,8 +356,8 @@ class DamageApplicator extends Application {
     const {actor, clone, saved} = this.actorData[uuid];
     if (saved && this.isCantrip) return actor;
     const {values, bypasses} = this.model;
-    const {total: damage, values: totals} = this.constructor.calculateDamage(clone, values, bypasses, !!saved);
-    return DamageApplicator._protoApplyDamage.call(actor, totals);
+    const {damages, options} = this.constructor.calculateDamage(actor, values, bypasses, !!saved, clone.system.traits);
+    return actor.applyDamage(damages, options);
   }
   /**
    * Perform a saving throw for the selected token's actor, then append the result just below.
@@ -392,12 +401,10 @@ class DamageApplicator extends Application {
    * @param {PointerEvent} event      The initiating click event.
    * @returns {object}                An object with `bypasses`, `saveData`, and `values`.
    */
-  static _getDataFromDamageRoll(event) {
+  static async _getDataFromDamageRoll(event) {
     const id = event.currentTarget.closest("[data-message-id]").dataset.messageId;
     const message = game.messages.get(id);
-    const data = {...message.flags[DamageApplicator.MODULE].damage};
-    data.bypasses = new Set(data.bypasses ?? []);
-    return data;
+    return this.retrieveMessageData(message);
   }
 
   /**
@@ -431,8 +438,8 @@ class DamageApplicator extends Application {
    * @returns {Promise<void>}
    */
   static async _quickApply(event) {
-    const {values, bypasses} = this._getDataFromDamageRoll(event);
     const undo = event.shiftKey;
+    const {values, bypasses} = await this._getDataFromDamageRoll(event);
     const actors = this._getActors();
     const fn = undo ? this.undoDamage : this.applyDamage;
     for (const actor of actors) await fn.call(this, actor, values, bypasses);
@@ -444,8 +451,8 @@ class DamageApplicator extends Application {
    * @returns {Promise<void>}
    */
   static async _quickApplyHalf(event) {
-    const {values, bypasses} = this._getDataFromDamageRoll(event);
     const undo = event.shiftKey;
+    const {values, bypasses} = await this._getDataFromDamageRoll(event);
     const actors = this._getActors();
     const fn = undo ? this.undoDamage : this.applyDamage;
     for (const actor of actors) await fn.call(this, actor, values, bypasses, true);
@@ -458,7 +465,7 @@ class DamageApplicator extends Application {
    * @returns {Promise<void>}
    */
   static async _quickSaveAndApply(event) {
-    const {bypasses, saveData, values, isCantrip} = this._getDataFromDamageRoll(event);
+    const {bypasses, saveData, values, isCantrip} = await this._getDataFromDamageRoll(event);
     const actors = this._getActors();
     for (const actor of actors) {
       const saved = await this.rollAbilitySave(actor, saveData.ability, saveData.dc, {event});
@@ -475,10 +482,10 @@ class DamageApplicator extends Application {
   static async _quickApplyHealing(event) {
     const id = event.currentTarget.closest("[data-message-id]").dataset.messageId;
     const message = game.messages.get(id);
-    const value = message.rolls[0].total;
+    const value = message.rolls.reduce((acc, roll) => acc + roll.total, 0);
     const actors = this._getActors();
     const undo = event.shiftKey ? 1 : -1;
-    for (const actor of actors) await actor.applyDamage(value, undo);
+    for (const actor of actors) await actor.applyDamage(value, {multiplier: undo});
   }
 
   /**
@@ -489,7 +496,7 @@ class DamageApplicator extends Application {
   static async _quickApplyTempHP(event) {
     const id = event.currentTarget.closest("[data-message-id]").dataset.messageId;
     const message = game.messages.get(id);
-    const value = message.rolls[0].total;
+    const value = message.rolls.reduce((acc, roll) => acc + roll.total, 0);
     const actors = this._getActors();
     for (const actor of actors) await actor.applyTempHP(value);
   }
@@ -529,8 +536,8 @@ class DamageApplicator extends Application {
   static async applyDamage(actor, values, bypasses, half = false) {
     bypasses ??= new Set();
     if (!this.canDamageActor(actor)) return null;
-    const {total, values: totals} = this.calculateDamage(actor, values, bypasses, half);
-    return this._protoApplyDamage.call(actor, totals);
+    const {damages, options} = this.calculateDamage(actor, values, bypasses, half);
+    return actor.applyDamage(damages, options);
   }
 
   /**
@@ -544,18 +551,19 @@ class DamageApplicator extends Application {
    */
   static async undoDamage(actor, values, bypasses, half = false, traits = null) {
     bypasses ??= new Set();
-    const {total, values: totals} = this.calculateDamage(actor, values, bypasses, half, traits);
-    return actor.applyDamage(total, -1);
+    const {damages, options} = this.calculateDamage(actor, values, bypasses, half, traits);
+    options.multiplier = -1;
+    return actor.applyDamage(damages, options);
   }
 
   /**
    * Calculate the damage taken by an actor, taking into account types, values, traits, bypasses, and halving.
-   * @param {Actor5e} actor                             The actor.
-   * @param {object} values                             An object with damage types as keys and their totals.
-   * @param {Set<string>} [passes]                      An array of properties that bypass traits.
-   * @param {boolean} [half=false]                      Should the values be halved?
-   * @param {object} [traits=null]                      An object of actor damage traits to use instead.
-   * @returns {object<total:number, values:object>}     The total damage taken (or healing granted), and modified values.
+   * @param {Actor5e} actor                               The actor.
+   * @param {object} values                               An object with damage types as keys and their totals.
+   * @param {Set<string>} [bypasses]                      An array of properties that bypass traits.
+   * @param {boolean} [half]                              Should the values be halved?
+   * @param {object} [traits]                             An object of actor damage traits to use instead.
+   * @returns {{damages: object[], options: object}}      Parameters to use for applyDamage.
    */
   static calculateDamage(actor, values, passes, half = false, traits = null) {
     passes ??= new Set();
@@ -581,7 +589,9 @@ class DamageApplicator extends Application {
       values[key] = Math.floor(value * (half ? 0.5 : 1));
       return acc + values[key];
     }, 0);
-    return {total: Math.max(0, total), values};
+
+    const damages = Object.entries(values).map(([k, v]) => ({value: v, type: k, properties: new Set()}));
+    return {total: Math.max(0, total), damages: damages, options: {ignore: true}};
   }
 
   /**
@@ -664,17 +674,17 @@ class DamageApplicator extends Application {
    */
   static async _appendToDamageRolls(message, [html]) {
     if (message.flags.dnd5e?.roll?.type !== "damage") return;
-    const roll = html.querySelector(".dice-roll");
     const div = document.createElement("DIV");
 
     const app = DamageApplicator;
+    const messageData = await app.retrieveMessageData(message);
 
-    const types = Object.keys(message.flags[app.MODULE].damage.values);
+    const types = Object.keys(messageData.values);
     const data = {
       isTempHP: types.includes("temphp"),
       isHealing: !types.includes("temphp") && types.includes("healing"),
       isDamage: !types.includes("temphp") && !types.includes("healing"),
-      save: message.flags[app.MODULE].damage.hasSave,
+      save: messageData.hasSave,
       isGM: game.user.isGM
     };
     div.innerHTML = await renderTemplate("modules/damage-application/templates/buttons.hbs", data);
@@ -687,7 +697,7 @@ class DamageApplicator extends Application {
       else if (action === "temphp") n.addEventListener("click", app._quickApplyTempHP.bind(app));
       else if (action === "healing") n.addEventListener("click", app._quickApplyHealing.bind(app));
     });
-    roll.after(div.firstElementChild);
+    html.querySelector(".message-content").appendChild(div.firstElementChild);
   }
 
   /**
@@ -695,134 +705,59 @@ class DamageApplicator extends Application {
    * @param {ChatMessage} message
    * @returns {DamageApplicator}
    */
-  static create(message) {
+  static async create(message) {
     const id = `${this.MODULE}-${message.id}`;
     const existing = Object.values(ui.windows).find(w => w.id === id);
     if (existing) for (const actor of existing.actors) delete actor.apps[id];
-    return new this(message).render(true);
+
+    const data = await this.retrieveMessageData(message);
+    return new this(message, data).render(true);
   }
 
   /**
-   * Append damage type and bypass properties to a damage roll message. Hooks on 'dnd5e.preRollDamage'.
-   * @param {Item|void} item      The item rolling damage. This may be undefined.
-   * @param {object} config       The configuration object for the damage roll.
+   * Add your current targets to the damage roll message.
+   * Hooks on `dnd5e.preRollDamage`.
+   * @param {Item5e} [item]     The item making the roll.
+   * @param {object} config     The roll config.
    */
-  static _appendDamageRollData(item, config) {
-    const parts = item?.system.damage.parts;
-    const indices = {};
-    const ammo = config.data?.ammo ? item.actor.items.get(item.system.consume.target) : null;
-    const ammoParts = ammo ? ammo.system.damage.parts : [];
-    const hasProps = ["ammo", "weapon"].includes(item?.type);
-    const data = config.event?.target?.closest(".roll-link")?.dataset; // Dataset for damage roll enrichers.
-    const damageParts = item ? parts.concat(ammoParts) : config.parts.map(p => [p, data.damageType || "none"]);
-    const rollData = item ? config.data : {};
+  static _preRollDamage(item, config) {
+    const targets = game.user.targets.ids;
+    const saveData = item?.system?.save || {};
+    const hasSave = item?.hasSave ?? false;
+    config.messageData[`flags.${this.MODULE}`] = {targets, saveData, hasSave};
+  }
 
-    let idx = 0;
-    for (const [formula, type] of damageParts) {
-      const terms = new CONFIG.Dice.DamageRoll(formula, rollData).terms;
-      for (const term of terms) {
-        if ([Die, NumericTerm, MathTerm, ParentheticalTerm].some(t => term instanceof t)) indices[idx] = type;
+  /**
+   * Retrieve needed data from a chat message.
+   * @param {ChatMessage} message     The message in chat.
+   * @returns {Promise<object|null>}
+   */
+  static async retrieveMessageData(message) {
+    if (message.flags.dnd5e?.roll?.type !== "damage") return null;
 
-        // Is the next term an actual new term, math-wise?
-        const nextTerm = terms[terms.indexOf(term) + 1];
-        const nextIsNewTerm = !nextTerm || ((nextTerm instanceof OperatorTerm) && ["+", "-"].includes(nextTerm.operator));
-        if (nextIsNewTerm) idx++;
+    const item = await fromUuid(message.flags.dnd5e.roll.itemUuid);
+    const values = {};
+
+    const agg = {};
+    for(const roll of message.rolls) message._aggregateDamageRoll(roll, agg);
+    for(const [k, v] of Object.entries(agg)) values[k] = v.total;
+
+    const properties = message.rolls.reduce((acc, roll) => {
+      for(const p of roll.options.properties) {
+        if (CONFIG.DND5E.itemProperties[p]?.isPhysical) acc.add(p);
       }
-    }
-
-    const physicalKeys = Object.entries(CONFIG.DND5E.itemProperties).reduce((acc, [k, v]) => {
-      if (v.isPhysical) acc.add(k);
       return acc;
     }, new Set());
-    const bypasses = hasProps ? physicalKeys.intersection(item.system.properties) : new Set();
-    const ammoBypasses = ammo ? physicalKeys.intersection(ammo.system.properties) : new Set();
 
-    config.messageData[`flags.${DamageApplicator.MODULE}.damage`] = {
-      indices: indices,
-      bypasses: [...bypasses.union(ammoBypasses)],
-      hasSave: item?.hasSave ?? false,
-      saveData: item?.system.save ?? {},
-      isCantrip: !!item && (item.type === "spell") && (item.system.level === 0),
-      targets: Array.from(game.user.targets.map(t => t.id))
+    return {
+      properties: properties,
+      item: item,
+      values: values,
+      isCantrip: (item?.type === "spell") && (item.system.level === 0),
+      saveData: message.flags[this.MODULE]?.saveData ?? {},
+      hasSave: message.flags[this.MODULE]?.hasSave ?? false,
+      targets: message.flags[this.MODULE]?.targets ?? []
     };
-  }
-
-  /**
-   * Append more properties after the roll has been thrown into chat. Hooks on 'preCreateChatMessage'.
-   * @param {ChatMessage} message     The message being posted in chat.
-   */
-  static _appendMoreDamageRollData(message) {
-    if (message.flags.dnd5e?.roll?.type !== "damage") return;
-
-    const indices = message.flags[DamageApplicator.MODULE].damage.indices;
-    const terms = message.rolls[0].terms;
-    let idx = 0;
-
-    // Toss the full array of terms into an object, respecting +/- operators only.
-    const pools = Object.fromEntries(Object.keys(indices).map(v => [v, {}]));
-    for (const term of terms) {
-      const isOp = term instanceof OperatorTerm;
-      const goNext = isOp && ["+", "-"].includes(term.operator) && (terms.indexOf(term) !== 0);
-      if (goNext) {
-        idx++;
-        pools[idx] = {sign: term.operator, terms: []};
-        continue;
-      } else {
-        pools[idx].sign ??= (isOp ? term.operator : "+");
-        pools[idx].type ??= indices[idx];
-        pools[idx].terms ??= [];
-        if (pools[idx].terms.length || !isOp) pools[idx].terms.push(term);
-      }
-    }
-
-    const defaultType = pools[0].type;
-
-    // Calculate totals of each pool, and assign damage type.
-    for (const i in pools) {
-      const terms = pools[i].terms;
-      const flavorType = DamageApplicator._isValidFlavorType(terms[0]?.options.flavor);
-
-      if (terms.length > 1) {
-        // If the pool has more than 1 term, ignore flavor.
-        pools[i].total = Roll.safeEval(terms.map(t => t.total).join(""));
-      } else if (flavorType) {
-        // If the single term has flavor, use that if it is valid.
-        pools[i].type = flavorType;
-        pools[i].total = terms[0]?.total ?? 0;
-      } else {
-        // Set the damage type to be what it already is, or if none found use the default one.
-        pools[i].type ??= defaultType;
-        pools[i].total = terms[0]?.total ?? 0;
-      }
-    }
-
-    // Figure out the totals of each damage type.
-    const values = Object.values(pools).reduce((acc, data) => {
-      const type = data.type;
-      acc[type] ??= 0;
-      if (data.sign === "+") acc[type] += data.total;
-      else if (data.sign === "-") acc[type] -= data.total;
-      return acc;
-    }, {});
-
-    message.updateSource({[`flags.${DamageApplicator.MODULE}.damage`]: {values: values}, "flags.core.canPopout": true});
-  }
-
-  /**
-   * Is the flavor used for a term a valid damage type?
-   * @param {string} flavor         The flavor, if any.
-   * @returns {string|boolean}      The corrected damage type, or false if invalid.
-   */
-  static _isValidFlavorType(flavor) {
-    if (!flavor) return false;
-    const lower = flavor.toLowerCase();
-    const types = CONFIG.DND5E.damageTypes;
-    const labels = Object.values(types).map(k => k.label);
-    if (flavor in types) return flavor;
-    else if (lower in types) return lower;
-    else if (labels.includes(flavor)) return Object.keys(types).find(k => types[k].label === flavor);
-    else if (labels.includes(lower)) return Object.keys(types).find(k => types[k].label === lower);
-    else return false;
   }
 
   /* -------------------------------------- */
@@ -832,18 +767,6 @@ class DamageApplicator extends Application {
   /* -------------------------------------- */
 
   /**
-   * When an actor is updated with values known from this module, display custom scrolling damage numbers.
-   * @param {Actor5e} actor
-   * @param {object} updates
-   * @param {object} options
-   * @param {string} userId
-   */
-  static _preUpdateActor(actor, updates, options, userId) {
-    if (!("dhp" in options) || !("daValues" in options)) return;
-    delete options.dhp;
-  }
-
-  /**
    * Read whether to display scrolling damage numbers.
    * @param {Actor5e} actor
    * @param {object} updates
@@ -851,14 +774,15 @@ class DamageApplicator extends Application {
    * @param {string} userId
    */
   static _updateActor(actor, updates, options, userId) {
-    if (!("daValues" in options)) return;
-    DamageApplicator.displayScrollingDamage(actor, options.daValues);
+    if (options[DamageApplicator.MODULE]?.damages) {
+      DamageApplicator.displayScrollingDamage(actor, options[DamageApplicator.MODULE].damages);
+    }
   }
 
   /**
    * Display damage numbers with typed colors on the tokens of an actor.
-   * @param {Actor5e} actor       The actor being damaged.
-   * @param {object} damages      An object of damage types and their totals.
+   * @param {Actor5e} actor         The actor being damaged.
+   * @param {object[]} damages      An object of damage types and their totals.
    * @returns {Promise<void>}
    */
   static async displayScrollingDamage(actor, damages) {
@@ -873,13 +797,13 @@ class DamageApplicator extends Application {
    * @param {object} values     Object of damage types and numeric values.
    * @returns {Promise<void>}
    */
-  static async _displayScrollingDamage(token, values) {
+  static async _displayScrollingDamage(token, damages) {
     if (!token.visible || !token.renderable) return;
     const px = Math.round(canvas.grid.size * 0.15);
     const hp = token.actor.system.attributes.hp.max;
     const origin = token.center;
-    for (const type in values) {
-      const amt = values[type] ? (-values[type].signedString()) : "0";
+    for (const {type, value} of damages) {
+      const amt = value ? (-value.signedString()) : "0";
       const pct = Math.clamped(amt / hp, 0, 1);
       canvas.interface.createScrollingText(origin, amt, {
         duration: 2000,
@@ -894,38 +818,6 @@ class DamageApplicator extends Application {
     }
   }
 
-  /**
-   * Custom damage application method that calculates like Actor5e#applyDamage and passes one more option.
-   * @param {object} daValues           An object of damage types and their totals.
-   * @returns {Promise<Actor5e>}        The updated actor.
-   */
-  static async _protoApplyDamage(daValues) {
-    let amount = Object.values(daValues).reduce((acc, v) => acc + v, 0);
-    amount = Math.floor(parseInt(amount));
-    const hp = this.system.attributes.hp;
-
-    // Deduct damage from temp HP first
-    const tmp = parseInt(hp.temp) || 0;
-    const dt = amount > 0 ? Math.min(tmp, amount) : 0;
-
-    // Remaining goes to health
-    const tmpMax = parseInt(hp.tempmax) || 0;
-    const dh = Math.clamped(hp.value - (amount - dt), 0, Math.max(0, hp.max + tmpMax));
-
-    // Update the Actor
-    const updates = {
-      "system.attributes.hp.temp": tmp - dt,
-      "system.attributes.hp.value": dh
-    };
-
-    // Delegate damage application to a hook.
-    const allowed = Hooks.call("modifyTokenAttribute", {
-      attribute: "attributes.hp", value: amount, isDelta: false, isBar: true
-    }, updates);
-    if (allowed !== false) await this.update(updates, {dhp: -amount, daValues});
-    return this;
-  }
-
   /* -------------------------------------- */
   /*                                        */
   /*                SETTINGS                */
@@ -937,7 +829,7 @@ class DamageApplicator extends Application {
       name: "DAMAGE_APP.SettingsColors",
       hint: "DAMAGE_APP.SettingsColorsHint",
       type: Boolean,
-      default: false,
+      default: true,
       config: true,
       scope: "world",
       requiresReload: true

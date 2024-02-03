@@ -11,11 +11,10 @@
   display: flex;
   flex-direction: column;
 }
+.damage-application.app header {}
 
 /* Message section */
-.damage-application.app .message-section {
-  margin-bottom: 1em;
-}
+.damage-application.app .message-section {}
 .damage-application.app .damage-types {
   display: flex;
   margin: 0;
@@ -34,6 +33,9 @@
 }
 .damage-application.app .damage-types .type label {
   flex: 2;
+  font-family: var(--dnd5e-font-roboto-slab);
+  font-size: var(--font-size-14);
+  font-weight: bold;
 }
 .damage-application.app .damage-types .type input {
   flex: 1;
@@ -61,13 +63,13 @@
   text-decoration: line-through;
 }
 .damage-application.app .actor {
-  border-top: 2px groove;
-  padding: 0.5em 0;
+  border-top: 1px solid var(--dnd5e-color-gold);
+  padding: 0.3em 0;
   display: grid;
   grid-template-columns: 5em 1.5fr 3fr 2.5fr;
 }
 .damage-application .actor > :not(:last-child) {
-  border-right: 2px groove;
+  border-right: 1px solid var(--dnd5e-color-gold);
 }
 .damage-application .actor .portrait {
   position: relative;
@@ -90,9 +92,11 @@
   text-align: center;
 }
 .damage-application.app .actor .header .name {
-  font-family: 'Modesto Condensed';
-  font-size: 2em;
+  font-family: var(--dnd5e-font-roboto-slab);
+  font-size: var(--font-size-14);
+  font-weight: bold;
   white-space: nowrap;
+  overflow: hidden;
 }
 .damage-application.app .actor .header img {
   border: none;
@@ -100,10 +104,17 @@
   min-width: 100px;
   min-height: 100px;
 }
-.damage-application .actor .trait-name {}
+.damage-application .actor .trait-name {
+  font-family: var(--dnd5e-font-roboto);
+  font-size: var(--font-size-12);
+  color: var(--color-text-dark-5);
+}
+.damage-application .actor .trait-name .fa-solid {
+  color: var(--color-text-dark-primary);
+}
 .damage-application .actor .trait-label {
   font-style: italic;
-  color: gray;
+  color: var(--dnd5e-color-tan);
 }
 .damage-application.app .actor .header .hasPlayer {
   font-style: italic;
@@ -111,7 +122,7 @@
 .damage-application.app .actor .header .health-bar {
   width: 90%;
   position: relative;
-  border: 1px groove black;
+  border: 1px solid var(--dnd5e-color-gold);
   height: 10px;
   margin: 3px 5px 0 5px;
   border-radius: 5px;
@@ -128,6 +139,11 @@
   display: flex;
   flex-direction: column;
 }
+.damage-application.app .trait-section .no-traits {
+  font-style: italic;
+  color: var(--dnd5e-color-tan);
+  text-align: center;
+}
 .damage-application.app .trait-section [data-action="toggle-trait"] {
   display: flex;
   justify-content: space-between;
@@ -136,10 +152,10 @@
   white-space: nowrap;
 }
 .damage-application.app .functions [data-action="saving-throw"].failure {
-  color: red;
+  color: var(--dnd5e-color-failure);
 }
 .damage-application.app .functions [data-action="saving-throw"].success {
-  color: green;
+  color: var(--dnd5e-color-success);
 }
 .damage-application.app .functions [data-action] .fa-solid {
   min-width: 1.5em;
@@ -148,12 +164,7 @@
 }
 
 /* Chatlog buttons */
-.damage-application.buttons .damage-roll-buttons {
+.damage-application.damage-roll-buttons {
   display: flex;
-  margin: 0;
   margin-top: 2px;
-}
-.damage-application.buttons .damage-roll-buttons button {
-  line-height: 20px;
-  font-size: 14px;
 }
