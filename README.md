@@ -1,4 +1,4 @@
-Interested in following along with development of any of my modules? Join the [Discord server](https://discord.gg/QAG8eWABGT). 
+Interested in following along with development of any of my modules? Join the [Discord server](https://discord.gg/QAG8eWABGT).
 
 # Damage Application
 
@@ -22,6 +22,9 @@ One button simply applies the damage, as is, to the actors of all selected token
 Lastly, if the item that rolled the damage had a saving throw, a button is available that will perform the relevant saving throw for each selected token's actor in sequence. The damage is then applied depending on the total of the roll; if the total of the roll is equal to or greater than the DC, half damage will be applied, otherwise the full damage will be applied. This again respects resistances, immunities, and vulnerabilities.
 
 Any button that applies damage can be shift-clicked to apply the same amount as healing instead.
+
+### Attacks
+With version 3.0.0 of the dnd5e system, this module adds additional context menu options on attack rolls for easily selecting tokens. You can left-click any of the targeted tokens to select them one by one, or right-click to select any tokens that were hit or missed.
 
 ### Example
 The below example shows the quick-application of a fireball's damage using some of the tools this module has available.
