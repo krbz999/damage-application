@@ -32,7 +32,9 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   /** Initialize module. */
   static init() {
     Hooks.on("renderChatMessage", DamageApplicator._appendToDamageRolls);
+    Hooks.on("dnd5e.renderChatMessage", DamageApplicator._appendToAttackRolls);
     Hooks.on("dnd5e.preRollDamage", DamageApplicator._preRollDamage.bind(DamageApplicator));
+    Hooks.on("getChatLogEntryContext", DamageApplicator._modifyChatLogContextMenu);
     game.modules.get(DamageApplicator.MODULE).api = DamageApplicator;
     DamageApplicator._registerSettings();
     Hooks.once("ready", function() {
@@ -41,7 +43,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
       Hooks.on("dnd5e.preCalculateDamage", function(actor, damages, options) {
         options[DamageApplicator.MODULE] = {damages};
       });
-      Hooks.on("dnd5e.preApplyDamage", function(actor, amount, updates, options){
+      Hooks.on("dnd5e.preApplyDamage", function(actor, amount, updates, options) {
         if (amount > 0 && options[DamageApplicator.MODULE]?.damages) {
           actor.update(updates, options);
           return false;
@@ -56,7 +58,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @param {object} data             Data retrieved from the chat message.
    * @param {object} [options]        Rendering options.
    */
-  constructor(message, data, options={}) {
+  constructor(message, data, options = {}) {
     super();
     // The initiating damage roll.
     this.message = message;
@@ -668,6 +670,74 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   /* -------------------------------------- */
 
   /**
+   * Add listeners to attack rolls to select and pan to targets. Hooks on 'renderChatMessage'.
+   * @param {ChatMessage} message     The message being rendered.
+   * @param {HTMLElement} html        The rendered html element.
+   */
+  static async _appendToAttackRolls(message, html) {
+    if (message.flags.dnd5e?.roll?.type !== "attack") return;
+
+    const [miss, hit] = Array.from(html.querySelectorAll("ul.dnd5e2.evaluation li.target")).partition(n => {
+      return n.classList.contains("hit");
+    });
+    for (const node of miss.concat(hit)) {
+      const uuid = node.dataset.uuid;
+      const actor = fromUuidSync(uuid);
+      if (!actor) continue;
+      node.addEventListener("click", (event) => {
+        const token = actor.token?.object ?? actor.getActiveTokens()[0];
+        if (!token) return;
+        const releaseOthers = !event.shiftKey;
+        if (token.controlled) token.release();
+        else {
+          token.control({releaseOthers});
+          canvas.animatePan({...token.center});
+        }
+      });
+    }
+  }
+
+  /**
+   * Add chat log context menu entries for selecting all tokens if they were hit or missed.
+   * @param {jQuery} html           The chat log html element.
+   * @param {object[]} options      The context menu options.
+   */
+  static _modifyChatLogContextMenu(html, options) {
+    const isAttack = ([li]) => game.messages.get(li.dataset.messageId)?.flags.dnd5e?.roll?.type === "attack";
+    options.push(
+      {
+        name: game.i18n.localize("DAMAGE_APP.ChatContextTargetHit"),
+        icon: "<i class='fa-solid fa-bullseye'></i>",
+        condition: isAttack,
+        callback: ([li]) => callback(li, "hit")
+      }, {
+      name: game.i18n.localize("DAMAGE_APP.ChatContextTargetMiss"),
+      icon: "<i class='fa-solid fa-bullseye'></i>",
+      condition: isAttack,
+      callback: ([li]) => callback(li, "miss")
+    }
+    );
+
+    /**
+     * Select some tokens based on whether they were hit or missed.
+     * @param {HTMLElement} li      The selected entry in the context menu.
+     * @param {string} type         The css class of the type to select ('hit' or 'miss').
+     */
+    function callback(li, type) {
+      const uuids = new Set();
+      li.closest("[data-message-id]").querySelectorAll(`ul.dnd5e2.evaluation li.target.${type}`).forEach(n => {
+        uuids.add(n.dataset.uuid);
+      });
+      canvas.tokens.releaseAll();
+      uuids.forEach(uuid => {
+        const actor = fromUuidSync(uuid);
+        const token = actor?.token?.object ?? actor?.getActiveTokens()[0];
+        if (token) token.control({releaseOthers: false});
+      });
+    }
+  }
+
+  /**
    * Append button(s) to damage rolls. Hooks on 'renderChatMessage'.
    * @param {ChatMessage} message     The message being rendered.
    * @param {HTMLElement} html        The rendered html element.
@@ -739,11 +809,11 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     const values = {};
 
     const agg = {};
-    for(const roll of message.rolls) message._aggregateDamageRoll(roll, agg);
-    for(const [k, v] of Object.entries(agg)) values[k] = v.total;
+    for (const roll of message.rolls) message._aggregateDamageRoll(roll, agg);
+    for (const [k, v] of Object.entries(agg)) values[k] = v.total;
 
     const properties = message.rolls.reduce((acc, roll) => {
-      for(const p of roll.options.properties) {
+      for (const p of roll.options.properties) {
         if (CONFIG.DND5E.itemProperties[p]?.isPhysical) acc.add(p);
       }
       return acc;

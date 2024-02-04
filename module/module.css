@@ -6,6 +6,9 @@
   opacity: 0.1;
   pointer-events: none;
 }
+.damage-application .window-content {
+  overflow: hidden;
+}
 .damage-application.app .content {
   overflow: hidden;
   display: flex;
@@ -167,4 +170,7 @@
 .damage-application.damage-roll-buttons {
   display: flex;
   margin-top: 2px;
+}
+ul.dnd5e2.evaluation li.target {
+  cursor: pointer;
 }

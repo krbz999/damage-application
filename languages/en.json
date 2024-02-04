@@ -5,6 +5,8 @@
   "DAMAGE_APP.ApplyHalfDamage": "Apply Half Damage",
   "DAMAGE_APP.ApplyHealing": "Apply Healing",
   "DAMAGE_APP.ApplyTempHP": "Apply Temp HP",
+  "DAMAGE_APP.ChatContextTargetHit": "Select Hit Targets",
+  "DAMAGE_APP.ChatContextTargetMiss": "Select Missed Targets",
   "DAMAGE_APP.DamageTaken": "{type}: {total}",
   "DAMAGE_APP.DamageTakenHead": "{name} damage taken:",
   "DAMAGE_APP.FindToken": "Find Token",
