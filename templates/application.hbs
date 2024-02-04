@@ -10,11 +10,11 @@
     </div>
     <div class="damage-total">{{localize "DAMAGE_APP.Total" total=total}}</div>
     <div class="buttons">
-      <button data-action="apply-damage-all">
+      <button type="button" data-action="apply-damage-all">
         <i class="fa-solid fa-burst"></i> {{localize "DAMAGE_APP.ApplyDamageToAll"}}
       </button>
       {{#if hasSave}}
-      <button data-action="saving-throw-all">
+      <button type="button" data-action="saving-throw-all">
         <i class="fa-solid fa-person-falling-burst"></i> {{localize "DAMAGE_APP.SavingThrowAll" dc=save.dc label=save.label}}
       </button>
       {{/if}}
