@@ -40,14 +40,14 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     Hooks.once("ready", function() {
       if (!game.settings.get(DamageApplicator.MODULE, "colors")) return;
       Hooks.on("updateActor", DamageApplicator._updateActor);
-      Hooks.on("dnd5e.preCalculateDamage", function(actor, damages, options) {
-        options[DamageApplicator.MODULE] = {damages};
+      Hooks.on("dnd5e.calculateDamage", function(actor, damages, options) {
+        options[DamageApplicator.MODULE] = {damages, colors: true};
       });
       Hooks.on("dnd5e.preApplyDamage", function(actor, amount, updates, options) {
-        if (amount > 0 && options[DamageApplicator.MODULE]?.damages) {
-          actor.update(updates, options);
-          return false;
-        }
+        const {damages, colors} = options[DamageApplicator.MODULE] ?? {};
+        if (!(amount > 0) || !damages || !colors) return;
+        actor.update(updates, options);
+        return false;
       });
     });
   }
@@ -63,7 +63,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     // The initiating damage roll.
     this.message = message;
 
-    // The damage types and the bypasses (mgc, ada, sil).
+    // The damage types and the properties (mgc, ada, sil).
     this.hasSave = data.hasSave;
     this.saveData = data.saveData;
     this.isCantrip = data.isCantrip;
@@ -82,7 +82,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
             acc[key] = new fields.NumberField({integer: true, min: 0, initial: 0})
             return acc;
           }, {})),
-          bypasses: new fields.SetField(new fields.StringField())
+          properties: new fields.SetField(new fields.StringField())
         };
       }
 
@@ -91,7 +91,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
         for (const key in this.values) if (!this.values[key]) delete this.values[key];
       }
 
-    })({values: data.values, bypasses: [...data.properties]});
+    })({values: data.values, properties: [...data.properties]});
 
     this.model.prepareDerivedData();
     this._saveHealthPositions = foundry.utils.debounce(this.#saveHealthPositions, 500);
@@ -155,7 +155,8 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
       this.actorData ??= {};
 
       const data = this.actorData[uuid] ??= {};
-      const clone = data.clone ??= actor.clone({}, {keepId: true});
+      const traits = data.clone?.toObject().system.traits ?? {};
+      const clone = data.clone = actor.clone({"system.traits": traits}, {keepId: true});
       const hp = actor.system.attributes.hp;
       const curr = hp.value + hp.temp;
       const max = hp.max + hp.tempmax;
@@ -184,7 +185,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
           // Is this type irrelevant due to being a physical damage type and bypassed?
           const isPhysical = dtype.isPhysical ?? false;
           const actorBypasses = actor.system.traits[d].bypasses.filter(k => itemProps[k]?.isPhysical);
-          if (isPhysical && this.model.bypasses.intersects(actorBypasses)) continue;
+          if (isPhysical && this.model.properties.intersects(actorBypasses)) continue;
 
           // For display purposes, is this trait conditional?
           const bypass = isPhysical && (actorBypasses.size > 0);
@@ -234,10 +235,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
 
   /** @override */
   render(force = false, options = {}) {
-    if (force) {
-      options.top = 150;
-      options.left = 150;
-    }
+    if (force) options.top = options.left = 150;
     if (!this.actors.size) {
       ui.notifications.warn("DAMAGE_APP.YouHaveNoValidTokens", {localize: true});
       return null;
@@ -344,9 +342,10 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @returns {Promise<Actor5e>}
    */
   async _undoDamageToActor(uuid) {
-    const {actor, clone, saved} = this.actorData[uuid];
-    const {values, bypasses} = this.model;
-    return DamageApplicator.undoDamage(actor, values, bypasses, !!saved, clone.system.traits);
+    const {clone, saved} = this.actorData[uuid];
+    const {values, properties} = this.model;
+    const mod = saved ? -0.5 : -1;
+    return DamageApplicator.applyDamageToActor(clone, values, properties, mod);
   }
 
   /**
@@ -357,9 +356,9 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   async _applyDamageToActor(uuid) {
     const {actor, clone, saved} = this.actorData[uuid];
     if (saved && this.isCantrip) return actor;
-    const {values, bypasses} = this.model;
-    const {damages, options} = this.constructor.calculateDamage(actor, values, bypasses, !!saved, clone.system.traits);
-    return actor.applyDamage(damages, options);
+    const {values, properties} = this.model;
+    const mod = saved ? 0.5 : 1;
+    return this.constructor.applyDamageToActor(clone, values, properties, mod);
   }
   /**
    * Perform a saving throw for the selected token's actor, then append the result just below.
@@ -401,7 +400,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   /**
    * Helper method to get module data from the chat message of a click event.
    * @param {PointerEvent} event      The initiating click event.
-   * @returns {object}                An object with `bypasses`, `saveData`, and `values`.
+   * @returns {object}                An object with `properties`, `saveData`, and `values`.
    */
   static async _getDataFromDamageRoll(event) {
     const id = event.currentTarget.closest("[data-message-id]").dataset.messageId;
@@ -441,10 +440,10 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    */
   static async _quickApply(event) {
     const undo = event.shiftKey;
-    const {values, bypasses} = await this._getDataFromDamageRoll(event);
+    const {values, properties} = await this._getDataFromDamageRoll(event);
     const actors = this._getActors();
     const fn = undo ? this.undoDamage : this.applyDamage;
-    for (const actor of actors) await fn.call(this, actor, values, bypasses);
+    for (const actor of actors) await fn.call(this, actor, values, properties);
   }
 
   /**
@@ -454,10 +453,10 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    */
   static async _quickApplyHalf(event) {
     const undo = event.shiftKey;
-    const {values, bypasses} = await this._getDataFromDamageRoll(event);
+    const {values, properties} = await this._getDataFromDamageRoll(event);
     const actors = this._getActors();
     const fn = undo ? this.undoDamage : this.applyDamage;
-    for (const actor of actors) await fn.call(this, actor, values, bypasses, true);
+    for (const actor of actors) await fn.call(this, actor, values, properties, true);
   }
 
   /**
@@ -467,12 +466,13 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @returns {Promise<void>}
    */
   static async _quickSaveAndApply(event) {
-    const {bypasses, saveData, values, isCantrip} = await this._getDataFromDamageRoll(event);
+    const {properties, saveData, values, isCantrip} = await this._getDataFromDamageRoll(event);
     const actors = this._getActors();
     for (const actor of actors) {
       const saved = await this.rollAbilitySave(actor, saveData.ability, saveData.dc, {event});
       if ((saved === null) || (isCantrip && saved)) continue;
-      await this.applyDamage(actor, values, bypasses, saved);
+      const mod = saved ? 0.5 : 1;
+      await this.applyDamageToActor(actor, values, properties, mod);
     }
   }
 
@@ -528,72 +528,46 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   }
 
   /**
-   * Apply damage to an actor, taking into account types, values, trait, bypasses.
+   * Apply damage to an actor, taking into account types, values, trait, properties.
    * @param {Actor5e} actor               The actor.
    * @param {object} values               An object with damage types as keys and their totals.
-   * @param {Set<string>} [bypasses]      Strings of bypass weapon properties.
-   * @param {boolean} [half=false]        Whether to halve the damage.
+   * @param {Set<string>} [properties]      Strings of bypass weapon properties.
+   * @param {boolean} [half]              Whether to halve the damage.
    * @returns {Promise<Actor5e|null>}
    */
-  static async applyDamage(actor, values, bypasses, half = false) {
-    bypasses ??= new Set();
+  static async applyDamage(actor, values, properties, half = false) {
     if (!this.canDamageActor(actor)) return null;
-    const {damages, options} = this.calculateDamage(actor, values, bypasses, half);
-    return actor.applyDamage(damages, options);
+    const mod = half ? 0.5 : 1;
+    return this.applyDamageToActor(actor, values, properties, mod);
   }
 
   /**
-   * Undo the damage done to an actor, taking into account types, values, traits, bypasses.
+   * Undo the damage done to an actor, taking into account types, values, traits, properties.
    * @param {Actor5e} actor               The actor.
    * @param {object} values               An object with damage types as keys and their totals.
-   * @param {Set<string>} [bypasses]      Strings of bypass weapon properties.
-   * @param {boolean} [half=false]        Whether to halve the damage.
-   * @param {object} [traits=null]        An object of actor damage traits to use instead.
+   * @param {Set<string>} [properties]      Strings of bypass weapon properties.
+   * @param {boolean} [half]              Whether to halve the damage.
    * @returns {Promise<Actor5e>}
    */
-  static async undoDamage(actor, values, bypasses, half = false, traits = null) {
-    bypasses ??= new Set();
-    const {damages, options} = this.calculateDamage(actor, values, bypasses, half, traits);
-    options.multiplier = -1;
-    return actor.applyDamage(damages, options);
+  static async undoDamage(actor, values, properties, half = false) {
+    const mod = half ? -0.5 : -1;
+    return this.applyDamageToActor(actor, values, properties, mod);
   }
 
   /**
-   * Calculate the damage taken by an actor, taking into account types, values, traits, bypasses, and halving.
-   * @param {Actor5e} actor                               The actor.
-   * @param {object} values                               An object with damage types as keys and their totals.
-   * @param {Set<string>} [bypasses]                      An array of properties that bypass traits.
-   * @param {boolean} [half]                              Should the values be halved?
-   * @param {object} [traits]                             An object of actor damage traits to use instead.
-   * @returns {{damages: object[], options: object}}      Parameters to use for applyDamage.
+   * Create the damages and options for Actor5e#applyDamage and execute it.
+   * @param {Actor5e} actor               The actor to apply damage to.
+   * @param {object} values               An object with damage types as keys and their totals.
+   * @param {Set<string>} [properties]      Strings of bypass weapon properties.
+   * @param {number} [mod]                A modifier to multiply all damage/healing by.
+   * @returns {Promise<Actor5e>}
    */
-  static calculateDamage(actor, values, passes, half = false, traits = null) {
-    passes ??= new Set();
-    values = foundry.utils.deepClone(values);
-    const {dr, di, dv} = ["dr", "di", "dv"].reduce((acc, d) => {
-      const trait = traits ? traits[d] : actor.system.traits[d];
-      const types = new Set(trait.value);
-      const bypasses = trait.bypasses.intersection(passes);
-      if (trait.custom?.length) for (const val of trait.custom.split(";")) {
-        const t = val.trim();
-        if (t in values) types.add(t);
-      }
-      for (const type of types) if (type in values) acc[d].push({
-        key: type, bypass: !!CONFIG.DND5E.damageTypes[type]?.isPhysical && (bypasses.size > 0)
-      });
-      return acc;
-    }, {dr: [], di: [], dv: []});
-    for (const d of dr) if (!d.bypass) values[d.key] *= 0.5;
-    for (const d of di) if (!d.bypass) values[d.key] = 0;
-    for (const d of dv) if (!d.bypass) values[d.key] *= 2;
-
-    const total = Object.entries(values).reduce((acc, [key, value]) => {
-      values[key] = Math.floor(value * (half ? 0.5 : 1));
-      return acc + values[key];
-    }, 0);
-
-    const damages = Object.entries(values).map(([k, v]) => ({value: v, type: k, properties: new Set()}));
-    return {total: Math.max(0, total), damages: damages, options: {ignore: true}};
+  static applyDamageToActor(actor, values, properties, mod = 1) {
+    const damages = Object.entries(values).map(([k, v]) => ({
+      type: k, value: v, properties: properties ?? new Set()
+    }));
+    const options = {multiplier: mod, ignore: false};
+    return actor.applyDamage(damages, options);
   }
 
   /**
@@ -646,14 +620,15 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @param {PointerEvent} event      The initiating click event.
    */
   _onToggleTrait(event) {
+    const enabled = event.currentTarget.classList.contains("enabled");
     const d = event.currentTarget.dataset.trait;
     const type = event.currentTarget.dataset.key;
     const uuid = event.currentTarget.closest("[data-actor-uuid]").dataset.actorUuid;
     const clone = this.actorData[uuid].clone;
-    const value = [...clone.system.traits[d].value];
-    if (value.includes(type)) value.findSplice(v => v === type);
-    else value.push(type);
-    clone.updateSource({[`system.traits.${d}.value`]: value});
+    const value = new Set(clone.system.traits[d].value);
+    if (enabled) value.delete(type);
+    else value.add(type);
+    clone.updateSource({[`system.traits.${d}.value`]: value.toObject()});
     this.render();
   }
 
@@ -844,9 +819,9 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @param {string} userId
    */
   static _updateActor(actor, updates, options, userId) {
-    if (options[DamageApplicator.MODULE]?.damages) {
-      DamageApplicator.displayScrollingDamage(actor, options[DamageApplicator.MODULE].damages);
-    }
+    const {damages, colors} = options[DamageApplicator.MODULE] ?? {};
+    if (!damages || !colors) return;
+    DamageApplicator.displayScrollingDamage(actor, damages);
   }
 
   /**
@@ -856,7 +831,6 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @returns {Promise<void>}
    */
   static async displayScrollingDamage(actor, damages) {
-    if (!damages) return;
     const tokens = actor.isToken ? [actor.token?.object] : actor.getActiveTokens(true);
     for (const token of tokens) DamageApplicator._displayScrollingDamage(token, damages);
   }
