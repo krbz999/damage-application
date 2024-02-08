@@ -81,7 +81,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
           values: new fields.SchemaField(Object.keys(CONFIG.DND5E.damageTypes).reduce((acc, key) => {
             acc[key] = new fields.NumberField({integer: true, min: 0, initial: 0})
             return acc;
-          }, {})),
+          }, {undefined: new fields.NumberField({integer: true, min: 0, initial: 0})})),
           properties: new fields.SetField(new fields.StringField())
         };
       }
@@ -127,7 +127,11 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     // Damage roll data.
     data.types = Object.entries(this.model.values).reduce((acc, [type, value]) => {
       const label = CONFIG.DND5E.damageTypes[type]?.label ?? CONFIG.DND5E.healingTypes[type]?.label;
-      if (label) acc.push({type: type, value: value, label: label});
+      acc.push({
+        type: label ? type : "undefined",
+        value: value,
+        label: label ? label : game.i18n.localize("DND5E.Unknown")
+      });
       return acc;
     }, []);
     data.total = Object.values(this.model.values).reduce((acc, v) => acc + v, 0);
@@ -292,6 +296,11 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   async close(...args) {
     for (const actor of this.actors) delete actor.apps[this.id];
     return super.close(...args);
+  }
+
+  /** @override */
+  _onToggleMinimize(event) {
+    if (this._minimized) return super._onToggleMinimize(event);
   }
 
   /**
@@ -788,7 +797,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     for (const [k, v] of Object.entries(agg)) values[k] = v.total;
 
     const properties = message.rolls.reduce((acc, roll) => {
-      for (const p of roll.options.properties) {
+      for (const p of roll.options.properties ?? []) {
         if (CONFIG.DND5E.itemProperties[p]?.isPhysical) acc.add(p);
       }
       return acc;
