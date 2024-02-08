@@ -688,19 +688,17 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    */
   static _modifyChatLogContextMenu(html, options) {
     const isAttack = ([li]) => game.messages.get(li.dataset.messageId)?.flags.dnd5e?.roll?.type === "attack";
-    options.push(
-      {
-        name: game.i18n.localize("DAMAGE_APP.ChatContextTargetHit"),
-        icon: "<i class='fa-solid fa-bullseye'></i>",
-        condition: isAttack,
-        callback: ([li]) => callback(li, "hit")
-      }, {
+    options.push({
+      name: game.i18n.localize("DAMAGE_APP.ChatContextTargetHit"),
+      icon: "<i class='fa-solid fa-bullseye'></i>",
+      condition: isAttack,
+      callback: ([li]) => callback(li, "hit")
+    }, {
       name: game.i18n.localize("DAMAGE_APP.ChatContextTargetMiss"),
       icon: "<i class='fa-solid fa-bullseye'></i>",
       condition: isAttack,
       callback: ([li]) => callback(li, "miss")
-    }
-    );
+    });
 
     /**
      * Select some tokens based on whether they were hit or missed.
@@ -840,23 +838,26 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @returns {Promise<void>}
    */
   static async displayScrollingDamage(actor, damages) {
+    const total = damages.reduce((acc, d) => acc + d.value, 0);
     const tokens = actor.isToken ? [actor.token?.object] : actor.getActiveTokens(true);
-    for (const token of tokens) DamageApplicator._displayScrollingDamage(token, damages);
+    for (const token of tokens) DamageApplicator._displayScrollingDamage(token, damages, total);
   }
 
   /**
    * Display scrolling damage numbers on one particular token.
    * @param {Token5e} token
    * @param {object} values     Object of damage types and numeric values.
+   * @param {number} total      The amount of damage taken.
    * @returns {Promise<void>}
    */
-  static async _displayScrollingDamage(token, damages) {
+  static async _displayScrollingDamage(token, damages, total) {
     if (!token.visible || !token.renderable) return;
     const px = Math.round(canvas.grid.size * 0.15);
     const hp = token.actor.system.attributes.hp.max;
     const origin = token.center;
+    token.document.flashRing({dhp: -total});
     for (const {type, value} of damages) {
-      const amt = value ? (-value.signedString()) : "0";
+      const amt = (value >= 1) ? (-Math.floor(value).signedString()) : "0";
       const pct = Math.clamped(amt / hp, 0, 1);
       canvas.interface.createScrollingText(origin, amt, {
         duration: 2000,
