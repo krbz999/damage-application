@@ -53,6 +53,12 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   }
 
   /**
+   * Mapping of actor uuids to relevant data.
+   * @type {Map}
+   */
+  actorData = new Map();
+
+  /**
    * @constructor
    * @param {ChatMessage} message     The chat message.
    * @param {object} data             Data retrieved from the chat message.
@@ -94,7 +100,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     })({values: data.values, properties: [...data.properties]});
 
     this.model.prepareDerivedData();
-    this._saveHealthPositions = foundry.utils.debounce(this.#saveHealthPositions, 500);
+    this.render = foundry.utils.debounce(this.render, 250);
   }
 
   /** @override */
@@ -122,7 +128,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
 
     // Actor data.
     this._prepareActors();
-    data.actors = Object.values(this.actorData);
+    data.actors = Array.from(this.actorData.values());
 
     // Damage roll data.
     data.types = Object.entries(this.model.values).reduce((acc, [type, value]) => {
@@ -150,15 +156,16 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     return data;
   }
 
-  /** Prepare the internal `actorData` object. */
+  /** Prepare the internal `actorData` map. */
   _prepareActors() {
     const types = Object.keys(this.model.values);
 
     for (const actor of this.actors) {
       const uuid = actor.uuid;
-      this.actorData ??= {};
+      this.actorData ??= new Map();
 
-      const data = this.actorData[uuid] ??= {};
+      const data = this.actorData.get(uuid) ?? {};
+      if (!this.actorData.has(uuid)) this.actorData.set(uuid, data);
       const traits = data.clone?.toObject().system.traits ?? {};
       const clone = data.clone = actor.clone({"system.traits": traits}, {keepId: true});
       const hp = actor.system.attributes.hp;
@@ -252,15 +259,14 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   /** @override */
   _saveScrollPositions(html) {
     super._saveScrollPositions(html);
-    if (!this._healthPositions) this.#saveHealthPositions(html);
-    else this._saveHealthPositions(html);
+    this._saveHealthPositions(html);
   }
 
   /**
    * Save the width of health bars.
    * @param {HTMLElement} html      The application's html.
    */
-  #saveHealthPositions([html]) {
+  _saveHealthPositions([html]) {
     this._healthPositions = {};
     for (const actor of html.querySelectorAll("[data-actor-uuid]")) {
       const uuid = actor.dataset.actorUuid;
@@ -320,7 +326,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    */
   _onRenderActor(event) {
     const uuid = event.currentTarget.closest("[data-actor-uuid]").dataset.actorUuid;
-    return this.actorData[uuid].actor.sheet.render(true);
+    return this.actorData.get(uuid).actor.sheet.render(true);
   }
 
   /**
@@ -340,7 +346,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @returns {Promise<Actor5e[]>}
    */
   async _onClickApplyDamageAll(event) {
-    const uuids = Object.keys(this.actorData);
+    const uuids = Array.from(this.actorData.keys());
     if (event.shiftKey) return Promise.all(uuids.map(uuid => this._undoDamageToActor(uuid)));
     return Promise.all(uuids.map(uuid => this._applyDamageToActor(uuid)));
   }
@@ -351,7 +357,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @returns {Promise<Actor5e>}
    */
   async _undoDamageToActor(uuid) {
-    const {clone, saved} = this.actorData[uuid];
+    const {clone, saved} = this.actorData.get(uuid);
     const {values, properties} = this.model;
     const mod = saved ? -0.5 : -1;
     return DamageApplicator.applyDamageToActor(clone, values, properties, mod);
@@ -363,7 +369,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    * @returns {Promise<Actor5e>}
    */
   async _applyDamageToActor(uuid) {
-    const {actor, clone, saved} = this.actorData[uuid];
+    const {actor, clone, saved} = this.actorData.get(uuid);
     if (saved && this.isCantrip) return actor;
     const {values, properties} = this.model;
     const mod = saved ? 0.5 : 1;
@@ -376,11 +382,11 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   async _onClickRollSave(event) {
     const uuid = event.currentTarget.closest("[data-actor-uuid]").dataset.actorUuid;
     event.currentTarget.style.pointerEvents = "none";
-    const actor = this.actorData[uuid].actor;
+    const actor = this.actorData.get(uuid).actor;
     if (!this.constructor.canDamageActor(actor)) return null;
     const saveData = this.saveData;
     const roll = await this.constructor.rollAbilitySave(actor, saveData.ability, saveData.dc, {event});
-    if (roll !== null) this.actorData[uuid].saved = roll;
+    if (roll !== null) this.actorData.get(uuid).saved = roll;
     this.render();
   }
 
@@ -391,11 +397,10 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    */
   async _onClickRollSaveAll(event) {
     const data = this.saveData;
-    for (const uuid in this.actorData) {
-      const actor = this.actorData[uuid].actor;
-      if (!this.constructor.canDamageActor(actor)) continue;
-      const roll = await this.constructor.rollAbilitySave(actor, data.ability, data.dc, {event});
-      if (roll !== null) this.actorData[uuid].saved = roll;
+    for (const v of this.actorData.values()) {
+      if (!this.constructor.canDamageActor(v.actor)) continue;
+      const roll = await this.constructor.rollAbilitySave(v.actor, data.ability, data.dc, {event});
+      if (roll !== null) v.saved = roll;
     }
     this.render();
   }
@@ -603,7 +608,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    */
   async _onPanToken(event) {
     const uuid = event.currentTarget.closest("[data-actor-uuid]").dataset.actorUuid;
-    const actor = this.actorData[uuid].actor;
+    const actor = this.actorData.get(uuid).actor;
     const token = actor.token?.object ?? actor.getActiveTokens()[0];
     if (!token) return null;
     const app = event.currentTarget.closest(".damage-application.app");
@@ -618,9 +623,9 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
    */
   _onToggleSuccess(event) {
     const uuid = event.currentTarget.closest("[data-actor-uuid]").dataset.actorUuid;
-    const state = this.actorData[uuid].saved;
-    if (state === null) return;
-    this.actorData[uuid].saved = !state;
+    const data = this.actorData.get(uuid);
+    if (data.saved === null) return;
+    data.saved = !data.saved;
     this.render();
   }
 
@@ -633,7 +638,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     const d = event.currentTarget.dataset.trait;
     const type = event.currentTarget.dataset.key;
     const uuid = event.currentTarget.closest("[data-actor-uuid]").dataset.actorUuid;
-    const clone = this.actorData[uuid].clone;
+    const clone = this.actorData.get(uuid).clone;
     const value = new Set(clone.system.traits[d].value);
     if (enabled) value.delete(type);
     else value.add(type);
