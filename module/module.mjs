@@ -293,7 +293,7 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
       const bar = html.querySelector(`[data-actor-uuid="${uuid}"] .health-bar .bar`);
       if (!bar) continue;
       const frames = [{width: w[uuid], easing: "ease"}, {width: bar.style.width}];
-      const duration = 750;
+      const duration = 250;
       bar.animate(frames, duration);
     }
   }
