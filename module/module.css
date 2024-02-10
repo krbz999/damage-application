@@ -71,6 +71,10 @@
   display: grid;
   grid-template-columns: 5em 1.5fr 3fr 2.5fr;
 }
+.damage-application.app .actor.dead {
+  opacity: 0.5;
+  order: -1;
+}
 .damage-application .actor > :not(:last-child) {
   border-right: 1px solid var(--dnd5e-color-gold);
 }

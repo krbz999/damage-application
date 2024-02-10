@@ -26,7 +26,7 @@
 
   <div class="actor-section">
     {{#each actors}}
-    <div class="actor" data-actor-uuid="{{actorUuid}}">
+    <div class="actor {{#if isDead}}dead{{/if}}" data-actor-uuid="{{actorUuid}}">
       <div class="portrait">
         <img src="{{img}}" data-tooltip="{{name}}" data-action="render-actor">
         {{#if isTarget}}

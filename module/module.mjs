@@ -2,7 +2,7 @@
  * An application that takes selected tokens, and lets you roll saving
  * throws and apply damage correctly via a the interface.
  */
-class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
+class DamageApplicator extends dnd5e.applications.DialogMixin(FormApplication) {
   /**
    * The module's id.
    * @type {string}
@@ -108,7 +108,10 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
     return foundry.utils.mergeObject(super.defaultOptions, {
       classes: [DamageApplicator.MODULE, "dnd5e2", "dialog"],
       template: "modules/damage-application/templates/application.hbs",
-      width: 620
+      width: 620,
+      submitOnChange: true,
+      submitOnClose: false,
+      closeOnSubmit: false
     });
   }
 
@@ -120,6 +123,12 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   /** @override */
   get id() {
     return `${DamageApplicator.MODULE}-${this.message.id}`;
+  }
+
+  /** @override */
+  _updateObject(event, formData) {
+    this.model.updateSource(formData);
+    this.render();
   }
 
   /** @override */
@@ -185,6 +194,8 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
       data.saved ??= null;
       data.savedCssClass = data.saved ? "success" : (data.saved === false) ? "failure" : "";
       data.saveIcon = (data.saved === null) ? "fa-person-falling-burst" : data.saved ? "fa-check" : "fa-times";
+      data.isDead = data.healthPct === 0;
+
       ["dr", "di", "dv"].forEach(d => {
         data[d] = [];
         const itemProps = CONFIG.DND5E.itemProperties;
@@ -235,9 +246,6 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
         n.addEventListener("click", this._onClickRollSave.bind(this));
         n.addEventListener("contextmenu", this._onToggleSuccess.bind(this));
       }
-    });
-    html[0].querySelectorAll(".damage-types [name]").forEach(n => {
-      n.addEventListener("change", this._onChangeDamageValue.bind(this));
     });
     html[0].querySelectorAll("INPUT[data-key]").forEach(n => {
       n.addEventListener("focus", event => event.currentTarget.select());
@@ -307,16 +315,6 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(Application) {
   /** @override */
   _onToggleMinimize(event) {
     if (this._minimized) return super._onToggleMinimize(event);
-  }
-
-  /**
-   * Update the data model when changing the value of a damage roll.
-   * @param {PointerEvent} event      The initiating change event.
-   */
-  _onChangeDamageValue(event) {
-    const data = new FormDataExtended(event.currentTarget.closest("FORM")).object;
-    this.model.updateSource(data);
-    this.render();
   }
 
   /**
