@@ -24,7 +24,7 @@ Lastly, if the item that rolled the damage had a saving throw, a button is avail
 Any button that applies damage can be shift-clicked to apply the same amount as healing instead.
 
 ### Attacks
-With version 3.0.0 of the dnd5e system, this module adds additional context menu options on attack rolls for easily selecting tokens. You can left-click any of the targeted tokens to select them one by one, or right-click to select any tokens that were hit or missed.
+With version 3.0.0 of the dnd5e system, this module adds additional context menu options on attack rolls for easily selecting tokens. You can left-click any of the targeted tokens in the chat message to select them one by one, or right-click to select any tokens that were hit or missed.
 
 ### Example
 The below example shows the quick-application of a fireball's damage using some of the tools this module has available.
