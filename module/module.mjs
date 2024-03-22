@@ -173,6 +173,8 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(FormApplication) {
       const uuid = actor.uuid;
       this.actorData ??= new Map();
 
+      const rollData = actor.getRollData({deterministic: true});
+
       const data = this.actorData.get(uuid) ?? {};
       if (!this.actorData.has(uuid)) this.actorData.set(uuid, data);
       const traits = data.clone?.toObject().system.traits ?? {};
@@ -196,38 +198,67 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(FormApplication) {
       data.saveIcon = (data.saved === null) ? "fa-person-falling-burst" : data.saved ? "fa-check" : "fa-times";
       data.isDead = data.healthPct === 0;
 
+      const isIgnored = (type, bp) => {
+        const isPhysical = CONFIG.DND5E.damageTypes[type].isPhysical ?? false;
+        if (!isPhysical) return false;
+        return isPhysical && this.model.properties.intersects(bp);
+      };
+
+      const isConditional = (type, bp) => {
+        const isPhysical = CONFIG.DND5E.damageTypes[type].isPhysical ?? false;
+        return isPhysical && (bp.size > 0);
+      };
+
+      const getLabel = (type, bp, bypass) => {
+        return bypass ? game.i18n.format("DND5E.DamagePhysicalBypasses", {
+          damageTypes: CONFIG.DND5E.damageTypes[type].label,
+          bypassTypes: [...bp.map(p => CONFIG.DND5E.itemProperties[p].label)].filterJoin(", ")
+        }) : CONFIG.DND5E.damageTypes[type].label;
+      };
+
+      const isRelevant = (type) => {
+        return !!CONFIG.DND5E.damageTypes[type] && types.includes(type);
+      };
+
+      const bypassesFiltered = (d) => {
+        const value = actor.system.traits[d].bypasses;
+        return value.filter(k => CONFIG.DND5E.itemProperties[k]?.isPhysical);
+      };
+
       ["dr", "di", "dv"].forEach(d => {
         data[d] = [];
-        const itemProps = CONFIG.DND5E.itemProperties;
         for (const value of actor.system.traits[d].value) {
-          if (!(value in CONFIG.DND5E.damageTypes) || !types.includes(value)) continue;
-
-          const dtype = CONFIG.DND5E.damageTypes[value];
-
-          // Is this type irrelevant due to being a physical damage type and bypassed?
-          const isPhysical = dtype.isPhysical ?? false;
-          const actorBypasses = actor.system.traits[d].bypasses.filter(k => itemProps[k]?.isPhysical);
-          if (isPhysical && this.model.properties.intersects(actorBypasses)) continue;
-
-          // For display purposes, is this trait conditional?
-          const bypass = isPhysical && (actorBypasses.size > 0);
-
-          const label = bypass ? game.i18n.format("DND5E.DamagePhysicalBypasses", {
-            damageTypes: dtype.label,
-            bypassTypes: [...actorBypasses.map(p => itemProps[p].label)].filterJoin(", ")
-          }) : dtype.label;
+          const actorBypasses = bypassesFiltered(d);
+          if (!isRelevant(value) || isIgnored(value, actorBypasses)) continue;
+          const bypass = isConditional(value, actorBypasses);
           data[d].push({
             key: value,
             bypass: bypass,
-            label: label,
+            label: getLabel(value, actorBypasses, bypass),
             enabled: clone.system.traits[d].value.has(value)
           });
         }
       });
+      data.dm = [];
+      for (const [k, v] of Object.entries(actor.system.traits.dm.amount)) {
+        const bypasses = bypassesFiltered("dm");
+        if (!isRelevant(k) || isIgnored(k, bypasses)) continue;
+        const bypass = isConditional(k, bypasses);
+        const bonus = dnd5e.utils.simplifyBonus(v, rollData);
+        if (bonus) data.dm.push({
+          key: k,
+          bypass: bypass,
+          label: getLabel(k, bypasses, bypass),
+          enabled: clone.system.traits.dm.amount[k] === v,
+          amount: bonus.signedString()
+        });
+      }
+
       data.hasResistance = data.dr.length > 0;
       data.hasInvulnerability = data.di.length > 0;
       data.hasVulnerability = data.dv.length > 0;
-      data.noTraits = !data.hasResistance && !data.hasInvulnerability && !data.hasVulnerability;
+      data.hasModifications = data.dm.length > 0;
+      data.noTraits = !data.hasResistance && !data.hasInvulnerability && !data.hasVulnerability && !data.hasModifications;
     }
   }
 
@@ -636,12 +667,18 @@ class DamageApplicator extends dnd5e.applications.DialogMixin(FormApplication) {
     const d = event.currentTarget.dataset.trait;
     const type = event.currentTarget.dataset.key;
     const uuid = event.currentTarget.closest("[data-actor-uuid]").dataset.actorUuid;
-    const clone = this.actorData.get(uuid).clone;
-    const value = new Set(clone.system.traits[d].value);
-    if (enabled) value.delete(type);
-    else value.add(type);
-    clone.updateSource({[`system.traits.${d}.value`]: value.toObject()});
-    this.render();
+    const {clone, actor} = this.actorData.get(uuid);
+    if (d === "dm") {
+      if (enabled) clone.updateSource({[`system.traits.dm.amount.${type}`]: ""});
+      else clone.updateSource({[`system.traits.dm.amount.${type}`]: actor.system.traits.dm.amount[type]});
+      this.render();
+    } else {
+      const value = new Set(clone.system.traits[d].value);
+      if (enabled) value.delete(type);
+      else value.add(type);
+      clone.updateSource({[`system.traits.${d}.value`]: value.toObject()});
+      this.render();
+    }
   }
 
   /** @override */

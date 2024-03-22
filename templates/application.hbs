@@ -73,6 +73,14 @@
         </a>
         {{/each}}
         {{/if}}
+        {{#if hasModifications}}
+        {{#each dm}}
+        <a class="{{#if enabled}}enabled{{/if}}" data-action="toggle-trait" data-trait="dm" data-key="{{key}}" {{#if bypass}} data-bypass="{{bypass}}" {{/if}}>
+          <span class="trait-name"><i class="fa-solid"></i> {{label}} ({{amount}})</span>
+          <div class="trait-label">{{localize "DAMAGE_APP.TraitModification"}}</div>
+        </a>
+        {{/each}}
+        {{/if}}
         {{#if noTraits}}
         <span class="no-traits">{{localize "DAMAGE_APP.NoRelevantTraits"}}</span>
         {{/if}}
