@@ -22,6 +22,7 @@
   "DAMAGE_APP.TargetedTokenHint": "This was targeted during the damage roll.",
   "DAMAGE_APP.Total": "Total: {total}",
   "DAMAGE_APP.TraitImmunity": "Immunity",
+  "DAMAGE_APP.TraitModification": "Modifier",
   "DAMAGE_APP.TraitResistance": "Resistance",
   "DAMAGE_APP.TraitVulnerability": "Vulnerability",
   "DAMAGE_APP.YouHaveNoValidTokens": "You have no valid tokens."
